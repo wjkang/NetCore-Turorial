@@ -1,0 +1,399 @@
+.clearfix::after {
+  content: '';
+  display: block;
+  clear: both;
+}
+label{
+  user-select: none;
+}
+.CodeMirror-hscrollbar {
+  overflow: hidden;
+}
+input[type="range"] {
+  margin: 0;
+}
+/* vuep */
+.vuep{
+  flex-direction: column;
+  height: initial;
+}
+.vuep-editor, .vuep-preview, .vuep-error{
+  width: 100%;
+  height: initial;
+}
+.vuep-editor pre{
+  font-family: Roboto Mono, Monaco, courier, monospace;
+}
+
+/* markdown */
+.markdown-section{
+  max-width: 929px;
+}
+.markdown-section a {
+  text-decoration: none;
+}
+.markdown-section iframe {
+  border: none;
+}
+.vuep-preview, .vuep-error{
+  padding: 8px;
+}
+
+/* stripes-background */
+@keyframes panoramic{
+  to {
+    background-position: 200% 0;
+  }
+}
+
+/* pie-chart */
+@keyframes pie-chart-spin1 {
+  to { transform: rotate(.5turn); }
+}
+@keyframes pie-chart-bg1 {
+  to { background: #b4a078; }
+}
+@keyframes pie-chart-spin2 {
+  to { transform: rotate(.5turn); }
+}
+@keyframes pie-chart-bg2 {
+  50% { background: #b4a078; }
+}
+@keyframes pie-chart-fillup{
+  to { stroke-dasharray: 100 100; }
+}
+@keyframes pie-chart-per1{
+  to { stroke-dasharray: 37 100; }
+}
+@keyframes pie-chart-per2{
+  to { stroke-dasharray: 32 100; }
+}
+@keyframes pie-chart-per3{
+  to { stroke-dasharray: 32 100; }
+}
+@keyframes text-blink-effect {
+  50% {
+    text-shadow: 0 0 .1em, 0 0 .3em;
+  }
+  to {
+      text-shadow: 0 0 .1em;
+  }
+}
+@keyframes circular-text-rotate {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+/* gitalk */
+.gt-container a {
+  color: #b4a078;
+}
+.gt-container a:hover {
+  color: #C3B393;
+  border-color: #C3B393;
+}
+.gt-container .gt-svg svg {
+  fill: #b4a078;
+}
+.gt-container .gt-spinner::before {
+  border-top-color: #b4a078;
+}
+.gt-container .gt-btn {
+  background-color: #b4a078;
+}
+.gt-container .gt-btn:hover {
+  background-color: #C3B393;
+}
+.gt-container .gt-link {
+  border-bottom: 1px dotted #b4a078;
+}
+.gt-container .gt-user .is--poping .gt-ico svg {
+  fill: #b4a078;
+}
+.gt-container .gt-popup .gt-action.is--active:before {
+  background: #b4a078;
+}
+.gt-container .gt-header-controls-tip {
+  color: #b4a078;
+}
+.gt-container .gt-comment-username {
+  color: #b4a078;
+}
+
+/* elastic */
+@keyframes elastic-grow {
+  from {
+      transform: scale(0);
+  }
+  70% {
+      transform: scale(1.1);
+      animation-timing-function: cubic-bezier(.1, .25, .1, .25);
+  }
+}
+@keyframes elastic-dec {
+  from {
+      transform: scale(1);
+  }
+  to {
+      transform: scale(0);
+      animation-timing-function: cubic-bezier(.25, .1, .25, .1);
+  }
+}
+
+/* blink */
+@keyframes blink-normal {
+  50% {
+    color: transparent;
+  }
+}
+@keyframes blink-alternate {
+  to {
+    color: transparent;
+  }
+}
+
+/* typing */
+@keyframes typing{
+  from {
+      width: 0;
+  }
+}
+@keyframes caret{
+  50% { border-right-color: currentColor}
+}
+
+/* shake */
+@keyframes shake-baidu {
+  from    { transform: rotate(0deg); }
+  4%      { transform: rotate(5deg); }
+  12.5%   { transform: rotate(-5deg); }
+  21%     { transform: rotate(5deg); }
+  29%     { transform: rotate(-5deg); }
+  37.5%   {  transform: rotate(5deg); }
+  46%     { transform: rotate(-5deg); }
+  50%,to  { transform: rotate(0deg); }
+}
+@keyframes shake {
+  2% { transform: translate(0.5px, 2.5px) rotate(1.5deg); }
+  4% { transform: translate(0.5px, -1.5px) rotate(0.5deg); }
+  6% { transform: translate(-0.5px, -1.5px) rotate(-0.5deg); }
+  8% { transform: translate(2.5px, -0.5px) rotate(0.5deg); }
+  10% { transform: translate(2.5px, 1.5px) rotate(0.5deg); }
+  12% { transform: translate(2.5px, -0.5px) rotate(0.5deg); }
+  14% { transform: translate(-1.5px, -1.5px) rotate(-0.5deg); }
+  16% { transform: translate(-0.5px, 0.5px) rotate(0.5deg); }
+  18% { transform: translate(-0.5px, 2.5px) rotate(1.5deg); }
+  20% { transform: translate(2.5px, -1.5px) rotate(1.5deg); }
+  22% { transform: translate(2.5px, -1.5px) rotate(0.5deg); }
+  24% { transform: translate(0.5px, -1.5px) rotate(-0.5deg); }
+  26% { transform: translate(-1.5px, 1.5px) rotate(0.5deg); }
+  28% { transform: translate(-1.5px, -0.5px) rotate(1.5deg); }
+  30% { transform: translate(-0.5px, -0.5px) rotate(1.5deg); }
+  32% { transform: translate(-0.5px, -0.5px) rotate(-0.5deg); }
+  34% { transform: translate(0.5px, -0.5px) rotate(0.5deg); }
+  36% { transform: translate(-1.5px, 1.5px) rotate(1.5deg); }
+  38% { transform: translate(2.5px, 1.5px) rotate(1.5deg); }
+  40% { transform: translate(1.5px, -1.5px) rotate(0.5deg); }
+  42% { transform: translate(1.5px, -1.5px) rotate(1.5deg); }
+  44% { transform: translate(1.5px, 2.5px) rotate(1.5deg); }
+  46% { transform: translate(1.5px, -1.5px) rotate(0.5deg); }
+  48% { transform: translate(-0.5px, -1.5px) rotate(0.5deg); }
+  50% { transform: translate(-1.5px, -1.5px) rotate(1.5deg); }
+  52% { transform: translate(1.5px, -0.5px) rotate(1.5deg); }
+  54% { transform: translate(-0.5px, -0.5px) rotate(0.5deg); }
+  56% { transform: translate(2.5px, 0.5px) rotate(0.5deg); }
+  58% { transform: translate(-0.5px, 0.5px) rotate(1.5deg); }
+  60% { transform: translate(0.5px, 1.5px) rotate(-0.5deg); }
+  62% { transform: translate(-0.5px, -1.5px) rotate(0.5deg); }
+  64% { transform: translate(-0.5px, -1.5px) rotate(0.5deg); }
+  66% { transform: translate(1.5px, -1.5px) rotate(-0.5deg); }
+  68% { transform: translate(0.5px, 1.5px) rotate(-0.5deg); }
+  70% { transform: translate(0.5px, 2.5px) rotate(-0.5deg); }
+  72% { transform: translate(2.5px, -1.5px) rotate(1.5deg); }
+  74% { transform: translate(-1.5px, -0.5px) rotate(0.5deg); }
+  76% { transform: translate(-1.5px, -1.5px) rotate(1.5deg); }
+  78% { transform: translate(0.5px, 0.5px) rotate(1.5deg); }
+  80% { transform: translate(0.5px, -0.5px) rotate(1.5deg); }
+  82% { transform: translate(-0.5px, -1.5px) rotate(1.5deg); }
+  84% { transform: translate(2.5px, -0.5px) rotate(1.5deg); }
+  86% { transform: translate(0.5px, 0.5px) rotate(-0.5deg); }
+  88% { transform: translate(1.5px, 2.5px) rotate(-0.5deg); }
+  90% { transform: translate(-1.5px, 2.5px) rotate(1.5deg); }
+  92% { transform: translate(-0.5px, -1.5px) rotate(-0.5deg); }
+  94% { transform: translate(1.5px, -0.5px) rotate(0.5deg); }
+  96% { transform: translate(-1.5px, 2.5px) rotate(1.5deg); }
+  98% { transform: translate(2.5px, 2.5px) rotate(0.5deg); }
+  0%, 100% { transform: translate(0, 0) rotate(0); } 
+}
+
+/* smooth */
+@keyframes smooth{
+  to {
+    background-position: 1970px center;
+  }
+}
+
+/* circular-smooth */
+@keyframes circular-smooth-spin {
+  from {
+    transform: rotate(0turn) translateY(-125px) rotate(1turn)
+  }
+  to {
+    opacity: 1;
+    transform: rotate(1turn) translateY(-125px) rotate(0turn)
+  }
+}
+
+/* text-underline */
+@keyframes text-underline-slideInLeft {
+  from {
+    background-position-x: -432px;
+  }
+  50% {
+    background-position-x: 0;
+  }
+  to {
+    background-position-x: 432px;
+  }
+}
+
+/* one-pixel-line */
+@media (min-resolution: 2dppx) {
+  main.main > span.one-pixel-line.shadow::after {
+    box-shadow: 0 0 0 .5px #b4a078;
+  }
+}
+@media (min-resolution: 3dppx) {
+  main.mian > span.one-pixel-line.shadow::after {
+    box-shadow: 0 0 0 .333333px #b4a078;
+  }
+}
+@media (min-resolution: 2dppx) {
+  main.main > span.one-pixel-line.top::before {
+    width: 200%;
+    transform: scale(.5) translateZ(0);
+  }
+}
+@media (min-resolution: 3dppx) {
+  main.main > span.one-pixel-line.top::before {
+    width: 300%;
+    transform: scale(.333333) translateZ(0);
+  }
+}
+@media (min-resolution: 2dppx) {
+  main.main > span.one-pixel-line.right::after {
+    height: 200%;
+    transform: scale(.5) translateZ(0);
+  }
+}
+@media (min-resolution: 3dppx) {
+  main.main > span.one-pixel-line.right::after {
+    height: 300%;
+    transform: scale(.333333) translateZ(0);
+  }
+}
+@media (min-resolution: 2dppx) {
+  main.main > span.one-pixel-line.bottom::after {
+    width: 200%;
+    transform: scale(.5) translateZ(0);
+  }
+}
+@media (min-resolution: 3dppx) {
+  main.main > span.one-pixel-line.bottom::after {
+    width: 300%;
+    transform: scale(.333333) translateZ(0);
+  }
+}
+@media (min-resolution: 2dppx) {
+  main.main > span.one-pixel-line.left::before {
+    height: 200%;
+    transform: scale(.5) translateZ(0);
+  }
+}
+@media (min-resolution: 3dppx) {
+  main.main > span.one-pixel-line.left::before {
+    height: 300%;
+    transform: scale(.333333) translateZ(0);
+  }
+}
+
+/* bounce */
+@keyframes bounce {
+  40%,
+  60%,
+  80%,
+  to {
+      transform: translateY(380px);
+      animation-timing-function: ease;
+  }
+  50% {
+      transform: translateY(260px);
+  }
+  70% {
+      transform: translateY(300px);
+  }
+  90% {
+      transform: translateY(360px);
+  }
+} 
+
+/* radio 公共样式 */
+.radio-wrap {
+  margin-right: 29px;
+}
+.radio-wrap input[type="radio"]{
+  position: absolute;
+  clip: rect(0, 0, 0, 0);
+}
+.radio-wrap input[type="radio"] + label{
+  display: inline-block;
+  height: 12px;
+  line-height: 10px; /* 英文 */
+  cursor: pointer;
+  position: relative;
+  user-select: none;
+}
+.radio-wrap input[type="radio"] + label:not(:nth-of-type(6)){
+  margin-top: 29px;
+  margin-bottom: 29px;
+}
+.radio-wrap input[type="radio"] + label::before{
+  content: "";
+  display: inline-block;
+  width: 10px; height: 10px;
+  border-radius: 8px;
+  vertical-align: top;
+  margin-right: .2em;
+  border: 1px solid #ccc;
+  background-color: #fff;
+  transition: border-color .2s ease-in-out, background-color .2s ease-in-out;
+}
+.radio-wrap input[type="radio"]:not(:disabled) + label:hover::before{
+  border-color: #b4a078;
+}
+.radio-wrap input[type="radio"]:checked + label::before{
+  border-color: #b4a078 !important;
+  background-color: #b4a078;
+}
+.radio-wrap input[type="radio"] + label::after{
+  content: "";
+  display: inline-block;
+  width: 4px; height: 4px;
+  background-color: #fff;
+  border-radius: 4px;
+  position: absolute;
+  left: 4px; top: 50%;
+  transform: translateY(-50%) scale(0);
+  transition: transform .2s ease-in-out;
+}
+.radio-wrap input[type="radio"]:checked + label::after{
+  transform: translateY(-50%) scale(1);
+  transition: transform .2s ease-in-out;
+}
+
+.yntkc-btn {
+  border: 1px solid rgba(180,160,120,.9);
+  padding: 1px 12px;
+  border-radius: 5px;
+}
