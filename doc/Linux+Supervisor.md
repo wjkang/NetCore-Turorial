@@ -132,3 +132,6 @@ Supervisor 常用命令
 >supervisorctl stop|start program_name
 
 >supervisorctl status #查看所有任务状态
+
+
+除了`Supervisor`，还可以使用[PM2](https://pm2.io/runtime/)
