@@ -146,3 +146,29 @@ docker pull ruoxie/citestimage:$1
 docker run --name citestcontainer -p 5006:5001 -d ruoxie/citestimage:$1
 ```
 >要将sh文件用VSCODE修改行尾序列为LF或者vim DOS转UNIX :set ff=unix
+
+获取运行容器对应的镜像名称
+```bash
+image=`docker inspect citestcontainer|jq .[0].Config.Image`
+```
+
+停止容器并删除
+```bash
+docker stop citestcontainer
+docker rm -f citestcontainer
+```
+
+处理镜像名称
+```bash
+rmImage=`echo  ${image} | sed 's/\"//g'`
+```
+
+>比如处理器前为 "ruoxie/citestimage:1.0.42"，处理后为ruoxie/citestimage:1.0.42，带双引号的名称docker无法识别
+
+删除旧镜像，拉取最新镜像并创建容器
+```bash
+docker rmi $rmImage
+docker images
+docker pull ruoxie/citestimage:$1
+docker run --name citestcontainer -p 5006:5001 -d ruoxie/citestimage:$1
+```
