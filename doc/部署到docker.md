@@ -130,7 +130,7 @@ ssh.Shell({
 相当于执行
 
 ```bash
-ssh -p $dPort $dUser@$dServer "bash" < rebuild.docker.sh $APPVEYOR_BUILD_VERSION
+ssh -p $dPort $dUser@$dServer "bash -s" <./rebuild.docker.sh $APPVEYOR_BUILD_VERSION
 ```
 **rebuild.docker.sh**
 ```bash
@@ -145,3 +145,4 @@ docker images
 docker pull ruoxie/citestimage:$1
 docker run --name citestcontainer -p 5006:5001 -d ruoxie/citestimage:$1
 ```
+>要将sh文件用VSCODE修改行尾序列为LF或者vim DOS转UNIX :set ff=unix
