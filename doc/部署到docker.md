@@ -41,6 +41,8 @@ ENTRYPOINT ["dotnet", "CiTest.dll"]
 * 将镜像push到镜像仓库
 * 通知服务器拉取新的镜像进行部署
 
+![](img/部署到docker/2019-01-14-12-30-38.png)
+
 #### 镜像仓库
 
 使用**[Docker Hub](https://hub.docker.com/)**作为镜像仓库
@@ -65,3 +67,40 @@ CI还是使用**appveyor**，但是环境切换到**Linux**下(因为构建的�
 安装nodejs程序依赖
 
 ![](img/部署到docker/2019-01-14-12-18-20.png)
+
+##### 编写Build脚本
+![](img/部署到docker/2019-01-14-12-22-52.png)
+
+```bash
+dotnet --version
+dotnet restore
+dotnet build
+dotnet publish -c Release --output /home/appveyor/projects/citest-uro3r/publish
+docker build --rm -t ruoxie/citestimage:$APPVEYOR_BUILD_VERSION -f Dockerfile .
+docker images
+```
+
+利用**appveyor**内置的**APPVEYOR_BUILD_VERSION**环境变量作为镜像Tag。
+
+通过**docker images**就可以看到CI工具本地已经构建的新镜像。
+
+##### 编写Tests脚本
+
+![](img/部署到docker/2019-01-14-14-33-27.png)
+
+```bash
+docker run --name citestcontainer -p 5006:5001 -d ruoxie/citestimage:$APPVEYOR_BUILD_VERSION
+docker logs citestcontainer
+```
+
+使用新的镜像创建容器，并查看日志。
+
+##### 编写Deployment脚本
+
+![](img/部署到docker/2019-01-14-14-51-00.png)
+
+```bash
+docker login -u $uDockerHub -p $pDockerHub
+docker push ruoxie/citestimage:$APPVEYOR_BUILD_VERSION
+node main.js $dServer $dPort $dUser $dPwd $APPVEYOR_BUILD_VERSION
+```
