@@ -104,3 +104,44 @@ docker login -u $uDockerHub -p $pDockerHub
 docker push ruoxie/citestimage:$APPVEYOR_BUILD_VERSION
 node main.js $dServer $dPort $dUser $dPwd $APPVEYOR_BUILD_VERSION
 ```
+
+首先登陆DockerHub，然后将最新的镜像push上去，完成后执行远程脚本，远程服务器拉取最新镜像重新部署。
+
+`$dServer $dPort $dUser $dPwd` 分别为部署服务器的地址，端口，登陆用户，密码的环境变量
+
+![](img/部署到docker/2019-01-14-14-56-58.png)
+
+**main.js**就是使用nodejs远程执行shell脚本
+
+```js
+var ssh = require("./ssh");
+var arg = process.argv.splice(2);
+
+ssh.Shell({
+    host: arg[0],
+    port: arg[1],
+    username: arg[2],
+    password: arg[3]
+}, 'image=`docker inspect citestcontainer|jq .[0].Config.Image`;echo $image;docker stop citestcontainer;docker rm -f citestcontainer;rmImage=`echo  ${image} | sed \'s/\\"//g\'`;docker rmi $rmImage;docker images;docker pull ruoxie/citestimage:'+arg[4]+';docker run --name citestcontainer -p 5006:5001 -d ruoxie/citestimage:'+arg[4]+';\nexit\n', function (data, buff) {
+    console.log(buff);
+});
+```
+
+相当于执行
+
+```bash
+ssh -p $dPort $dUser@$dServer "bash" < rebuild.docker.sh $APPVEYOR_BUILD_VERSION
+```
+**rebuild.docker.sh**
+```bash
+#!/bin/bash
+image=`docker inspect citestcontainer|jq .[0].Config.Image`
+echo $image
+docker stop citestcontainer
+docker rm -f citestcontainer
+rmImage=`echo  ${image} | sed 's/\"//g'`
+docker rmi $rmImage
+docker images
+docker pull ruoxie/citestimage:$1
+docker run --name citestcontainer -p 5006:5001 -d ruoxie/citestimage:$1
+```
