@@ -25,6 +25,8 @@ namespace Middleware
             {
                 app.UseDeveloperExceptionPage();
             }
+            app.UseMyMiddlewareByClass();
+            app.UseMyMiddleware();
             #region Use
             //app.Use(async (context, next) =>
             //{
