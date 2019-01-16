@@ -17,9 +17,9 @@ namespace Middleware
             });
             return app;
         }
-        public static IApplicationBuilder UseMyMiddlewareByClass(this IApplicationBuilder app)
+        public static IApplicationBuilder UseMyMiddlewareByClass(this IApplicationBuilder app,string otherParams="")
         {
-            app.UseMiddleware<MyMiddleware>();
+            app.UseMiddleware<MyMiddleware>(otherParams);
             return app;
         }
     }
