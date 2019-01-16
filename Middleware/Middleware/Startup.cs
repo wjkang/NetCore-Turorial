@@ -25,18 +25,66 @@ namespace Middleware
             {
                 app.UseDeveloperExceptionPage();
             }
-            app.Use(async (context, next) =>
+            #region Use
+            //app.Use(async (context, next) =>
+            //{
+            //    await context.Response.WriteAsync("进入第1个委托，执行下一个委托之前\r\n");
+            //    await next();
+            //    await context.Response.WriteAsync("结束第1个委托，执行下一个委托之后\r\n");
+            //});
+            //app.Use(async (context, next) =>
+            //{
+            //    await context.Response.WriteAsync("进入第2个委托，执行下一个委托之前\r\n");
+            //    await next();
+            //    await context.Response.WriteAsync("结束第2个委托，执行下一个委托之后\r\n");
+            //});
+            #endregion
+            #region Map
+            //app.Map("/map1", (level1app) =>
+            //{
+            //    level1app.Use(async (context, next) =>
+            //    {
+            //        await context.Response.WriteAsync("进入第1个委托，执行下一个委托之前\r\n");
+            //        await next();
+            //        await context.Response.WriteAsync("结束第1个委托，执行下一个委托之后\r\n");
+            //    });
+            //    level1app.Use(async (context, next) =>
+            //    {
+            //        await context.Response.WriteAsync("进入第2个委托，执行下一个委托之前\r\n");
+            //        await next();
+            //        await context.Response.WriteAsync("结束第2个委托，执行下一个委托之后\r\n");
+            //    });
+            //    level1app.Map("/map12", (level2app) =>
+            //    {
+            //        //level1app.use 注册的委托仍生效
+            //        level2app.Run(async (context) =>
+            //        {
+            //            await context.Response.WriteAsync("map2\r\n");
+            //        });
+            //    });
+            //    level1app.Run(async (context) =>
+            //    {
+            //        await context.Response.WriteAsync("map1\r\n");
+            //    });
+            //    //不管app.run 在 level1app.Run之前还是之后，分支管道都会被阻断，没有任何输出
+            //    //app.Run(async (context) =>
+            //    //{
+            //    //    await context.Response.WriteAsync("Hello World!\r\n");
+            //    //});
+            //});
+            #endregion
+
+            #region MapWhen
+            app.MapWhen(context => context.Request.Query.ContainsKey("branch"), (level1app) =>
             {
-                await context.Response.WriteAsync("进入第1个委托，执行下一个委托之前\r\n");
-                await next();
-                await context.Response.WriteAsync("结束第1个委托，执行下一个委托之后\r\n");
+                level1app.Run(async (context) =>
+                {
+                    var branchVer = context.Request.Query["branch"];
+                    await context.Response.WriteAsync($"Branch used = {branchVer}");
+                });
             });
-            app.Use(async (context, next) =>
-            {
-                await context.Response.WriteAsync("进入第2个委托，执行下一个委托之前\r\n");
-                await next();
-                await context.Response.WriteAsync("结束第2个委托，执行下一个委托之后\r\n");
-            });
+            #endregion
+
             app.Run(async (context) =>
             {
                 await context.Response.WriteAsync("Hello World!\r\n");
