@@ -15,7 +15,9 @@ namespace DependencyInjection
         // For more information on how to configure your application, visit https://go.microsoft.com/fwlink/?LinkID=398940
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddScoped<IMyDependency, MyDependency>();
+            //services.AddScoped<IMyDependency, MyDependency>();
+            services.AddMyService();
+            services.AddOperation();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -25,6 +27,7 @@ namespace DependencyInjection
             {
                 app.UseDeveloperExceptionPage();
             }
+            app.UseOperation();
             app.UseMyMiddlewareByClass("123");
 
             app.Run(async (context) =>
