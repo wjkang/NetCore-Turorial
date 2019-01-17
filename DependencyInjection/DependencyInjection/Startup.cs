@@ -27,6 +27,11 @@ namespace DependencyInjection
             {
                 app.UseDeveloperExceptionPage();
             }
+            app.Use(async(context, next) =>
+            {
+                await context.Response.WriteAsync(string.Format("Request Time:{0}\r\n",DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")));
+                await next();
+            });
             app.UseOperation();
             app.UseMyMiddlewareByClass("123");
 

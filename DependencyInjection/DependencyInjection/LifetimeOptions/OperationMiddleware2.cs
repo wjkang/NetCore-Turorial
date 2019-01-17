@@ -23,10 +23,10 @@ namespace DependencyInjection.LifetimeOptions
             IOperationSingletonInstance operationSingletonInstance
             )
         {
-            await context.Response.WriteAsync(string.Format("In OperationMiddleware2 operationTransient is:{0}!\r\n", operationTransient.OperationId.ToString()));
-            await context.Response.WriteAsync(string.Format("In OperationMiddleware2 operationScoped is:{0}!\r\n", operationScoped.OperationId.ToString()));
-            await context.Response.WriteAsync(string.Format("In OperationMiddleware2 operationSingleton is:{0}!\r\n", operationSingleton.OperationId.ToString()));
-            await context.Response.WriteAsync(string.Format("In OperationMiddleware2 operationSingletonInstance is:{0}!\r\n", operationSingletonInstance.OperationId.ToString()));
+            await context.Response.WriteAsync(string.Format("In OperationMiddleware2 operationTransient is:{0}\r\n", operationTransient.OperationId.ToString()));
+            await context.Response.WriteAsync(string.Format("In OperationMiddleware2 operationScoped is:{0}\r\n", operationScoped.OperationId.ToString()));
+            await context.Response.WriteAsync(string.Format("In OperationMiddleware2 operationSingleton is:{0}\r\n", operationSingleton.OperationId.ToString()));
+            await context.Response.WriteAsync(string.Format("In OperationMiddleware2 operationSingletonInstance is:{0}\r\n", operationSingletonInstance.OperationId.ToString()));
             await _next(context);
         }
     }
