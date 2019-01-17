@@ -20,6 +20,7 @@ namespace Microsoft.Extensions.DependencyInjection
             services.AddScoped<IOperationScoped, Operation>();
             services.AddSingleton<IOperationSingleton, Operation>();
             services.AddSingleton<IOperationSingletonInstance>(new Operation());
+            services.AddSingleton<MySingletonService>();
         }
     }
 }

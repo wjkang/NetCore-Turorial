@@ -19,6 +19,7 @@ namespace DependencyInjection
         {
             app.UseMiddleware<OperationMiddleware1>();
             app.UseMiddleware<OperationMiddleware2>();
+            app.UseMiddleware<OperationMiddleware3>();
             return app;
         }
     }
