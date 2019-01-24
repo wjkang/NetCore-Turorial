@@ -59,7 +59,7 @@ var blackCat='./libs/live2d-widget/live2d-widget-model-hijiki/assets/hijiki.mode
 var whiteCat='./libs/live2d-widget/live2d-widget-model-tororo/assets/tororo.model.json';
 L2Dwidget.init({
   model: {
-    jsonPath: Math.random()>.5?blackCat:whiteCat,
+    jsonPath: Math.random()>.5?blackCat:blackCat,
   },
   display: {
     width: 50,
