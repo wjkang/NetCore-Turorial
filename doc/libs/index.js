@@ -56,7 +56,7 @@ window.$docsify = {
   // ]
 }
 var blackCat='./libs/live2d-widget/live2d-widget-model-hijiki/assets/hijiki.model.json';
-var whiteCat:'./libs/live2d-widget/live2d-widget-model-tororo/assets/tororo.model.json',
+var whiteCat:'./libs/live2d-widget/live2d-widget-model-tororo/assets/tororo.model.json';
 L2Dwidget.init({
   model: {
     jsonPath: Math.random()>.5?blackCat:whiteCat,
