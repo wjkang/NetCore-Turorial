@@ -25,7 +25,11 @@ namespace CustomHost.Internal.Implementation
 
         public IServiceProvider Initialize()
         {
-            return _hostingServiceProvider;
+            if (_applicationServices == null)
+            {
+                _applicationServices = BuildApplication();
+            }
+            return _applicationServices;
         }
 
         public IDisposable Run()
@@ -39,6 +43,32 @@ namespace CustomHost.Internal.Implementation
             {
                 EnsureStartup();
                 _applicationServices = _startup.ConfigureServices(_builder);
+            }
+        }
+        private void EnsureStartup()
+        {
+            if (_startup != null)
+            {
+                return;
+            }
+
+            _startup = _hostingServiceProvider.GetRequiredService<IStartup>();
+        }
+        private IServiceProvider BuildApplication()
+        {
+            try
+            {
+                EnsureApplicationServices();
+                Action<IServiceProvider> configure = _startup.Configure;
+                if (_applicationServices == null)
+                    _applicationServices = _builder.BuildServiceProvider();
+                configure(_applicationServices);
+                return _applicationServices;
+            }
+            catch (Exception ex)
+            {
+                Console.Out.WriteLine("应用程序启动异常: " + ex.ToString());
+                throw;
             }
         }
     }
