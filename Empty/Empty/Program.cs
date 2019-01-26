@@ -20,6 +20,7 @@ namespace Empty
         public static IWebHost BuildWebHost(string[] args) =>
             WebHost.CreateDefaultBuilder(args)
                 .UseUrls("http://*:5000")
+                .UseIISIntegration()
                 .UseStartup<Startup>()
                 .Build();
     }
