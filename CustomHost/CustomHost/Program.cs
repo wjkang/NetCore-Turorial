@@ -1,5 +1,6 @@
 ﻿using CustomHost.Internal;
 using CustomHost.Internal.Implementation;
+using Microsoft.Extensions.DependencyInjection;
 using System;
 
 namespace CustomHost
@@ -16,7 +17,7 @@ namespace CustomHost
             new ServiceHostBuilder()
                 .RegisterServices(builder =>
                 {
-
+                    builder.AddScoped<MyService>();
                 })
                 .UseStartup<StartupImplementation>()
                 .Build();

@@ -10,7 +10,7 @@ namespace CustomHost
     {
         public IServiceProvider ConfigureServices(IServiceCollection services)
         {
-            services.AddScoped<MyService>();
+            //services.AddScoped<MyService>();
             return services.BuildServiceProvider();
         }
 
