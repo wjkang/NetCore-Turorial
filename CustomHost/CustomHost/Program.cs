@@ -8,6 +8,7 @@ namespace CustomHost
     {
         static void Main(string[] args)
         {
+            var host=
             BuildHost().Run();
         }
 
