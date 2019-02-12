@@ -1,8 +1,6 @@
 ﻿using CustomHost.Startup;
 using Microsoft.Extensions.DependencyInjection;
 using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace CustomHost.Internal.Implementation
 {

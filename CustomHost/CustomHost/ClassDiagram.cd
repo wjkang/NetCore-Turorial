@@ -1,109 +1,109 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <ClassDiagram MajorVersion="1" MinorVersion="1">
-  <Class Name="CustomHost.Internal.Implementation.ConfigureBuilder" Collapsed="true">
-    <Position X="1.25" Y="0.5" Width="1.5" />
+  <Class Name="CustomHost.Internal.Implementation.ConfigureBuilder">
+    <Position X="11" Y="5" Width="2.5" />
     <TypeIdentifier>
       <HashCode>AAAAAAAAAAAICAAAAAAAAAAAAAAAgAAAAAAAAAAAAAA=</HashCode>
       <FileName>Internal\Implementation\ConfigureBuilder.cs</FileName>
     </TypeIdentifier>
   </Class>
-  <Class Name="CustomHost.Internal.Implementation.ConfigureContainerBuilder" Collapsed="true">
-    <Position X="3" Y="0.5" Width="1.5" />
+  <Class Name="CustomHost.Internal.Implementation.ConfigureContainerBuilder">
+    <Position X="7.75" Y="2.25" Width="2.75" />
     <TypeIdentifier>
       <HashCode>AAAAAAAAAAAICAAAAAAAAAAAAAAAgAAAAAAAABAAAAA=</HashCode>
       <FileName>Internal\Implementation\ConfigureContainerBuilder.cs</FileName>
     </TypeIdentifier>
   </Class>
-  <Class Name="CustomHost.Internal.Implementation.ConfigureServicesBuilder" Collapsed="true">
-    <Position X="4.75" Y="0.5" Width="1.5" />
+  <Class Name="CustomHost.Internal.Implementation.ConfigureServicesBuilder">
+    <Position X="11" Y="2.75" Width="2.5" />
     <TypeIdentifier>
       <HashCode>AAAAAAAAAAAICAAAAAAAAAAAAAAAgAAAAAAAAAAAAAA=</HashCode>
       <FileName>Internal\Implementation\ConfigureServicesBuilder.cs</FileName>
     </TypeIdentifier>
   </Class>
-  <Class Name="CustomHost.Internal.Implementation.ServiceHost" Collapsed="true" BaseTypeListCollapsed="true">
-    <Position X="4.75" Y="1.5" Width="1.5" />
+  <Class Name="CustomHost.Internal.Implementation.ServiceHost" BaseTypeListCollapsed="true">
+    <Position X="4.5" Y="2.25" Width="2.5" />
     <TypeIdentifier>
       <HashCode>AAAAAAAAACAAQQAAAAAAIAAAAAAAAACAAQAAAAAADAY=</HashCode>
       <FileName>Internal\Implementation\ServiceHost.cs</FileName>
     </TypeIdentifier>
     <Lollipop Position="0.2" Collapsed="true" />
   </Class>
-  <Class Name="CustomHost.Internal.Implementation.ServiceHostBuilder" Collapsed="true" BaseTypeListCollapsed="true">
-    <Position X="6.5" Y="1.5" Width="1.75" />
+  <Class Name="CustomHost.Internal.Implementation.ServiceHostBuilder" BaseTypeListCollapsed="true">
+    <Position X="1.25" Y="2.25" Width="2.5" />
     <TypeIdentifier>
       <HashCode>AAAAAAAQAAAAEAAAAAAAAAAAAAAAgAAAAAABCABAAAA=</HashCode>
       <FileName>Internal\Implementation\ServiceHostBuilder.cs</FileName>
     </TypeIdentifier>
     <Lollipop Position="0.2" Collapsed="true" />
   </Class>
-  <Class Name="CustomHost.Internal.Implementation.StartupLoader" Collapsed="true">
-    <Position X="4.75" Y="2.5" Width="1.5" />
+  <Class Name="CustomHost.Internal.Implementation.StartupLoader">
+    <Position X="4.5" Y="7.5" Width="2.5" />
     <TypeIdentifier>
       <HashCode>AAAAAAAAAAAAAAAAAAgAABAAQAAAAIggAAAAAAAAAAA=</HashCode>
       <FileName>Internal\Implementation\StartupLoader.cs</FileName>
     </TypeIdentifier>
   </Class>
-  <Class Name="CustomHost.Startup.Implementation.ConventionBasedStartup" Collapsed="true" BaseTypeListCollapsed="true">
-    <Position X="6.5" Y="0.5" Width="1.5" />
+  <Class Name="CustomHost.Startup.Implementation.ConventionBasedStartup" BaseTypeListCollapsed="true">
+    <Position X="11" Y="0.5" Width="2.25" />
     <TypeIdentifier>
       <HashCode>AAAAAAAAAAAAAIAAAABAAAAAAAAAAAAAAAAACAAAAAA=</HashCode>
       <FileName>Startup\Implementation\ConventionBasedStartup.cs</FileName>
     </TypeIdentifier>
     <Lollipop Position="0.2" Collapsed="true" />
   </Class>
-  <Class Name="CustomHost.Startup.Implementation.StartupMethods" Collapsed="true">
-    <Position X="6.5" Y="2.5" Width="1.5" />
+  <Class Name="CustomHost.Startup.Implementation.StartupMethods">
+    <Position X="7.75" Y="6.5" Width="2.5" />
     <TypeIdentifier>
       <HashCode>AEAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAABAAAAAAA=</HashCode>
       <FileName>Startup\Implementation\StartupMethods.cs</FileName>
     </TypeIdentifier>
   </Class>
-  <Class Name="CustomHost.MyService" Collapsed="true">
-    <Position X="1.25" Y="1.5" Width="1.5" />
+  <Class Name="CustomHost.MyService">
+    <Position X="1.25" Y="5" Width="2.5" />
     <TypeIdentifier>
       <HashCode>AAAAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
       <FileName>MyService.cs</FileName>
     </TypeIdentifier>
   </Class>
-  <Class Name="CustomHost.Program" Collapsed="true">
-    <Position X="3" Y="1.5" Width="1.5" />
+  <Class Name="CustomHost.Program">
+    <Position X="4.5" Y="5.75" Width="2.5" />
     <TypeIdentifier>
       <HashCode>AAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAAAABAAAAAA=</HashCode>
       <FileName>Program.cs</FileName>
     </TypeIdentifier>
   </Class>
-  <Class Name="CustomHost.ServiceHostBuilderExtensions" Collapsed="true">
-    <Position X="1.25" Y="2.5" Width="1.5" />
+  <Class Name="CustomHost.ServiceHostBuilderExtensions">
+    <Position X="1.25" Y="7" Width="2.5" />
     <TypeIdentifier>
       <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAAAAAAAAA=</HashCode>
       <FileName>ServiceHostBuilderExtensions.cs</FileName>
     </TypeIdentifier>
   </Class>
-  <Class Name="CustomHost.StartupImplementation" Collapsed="true" BaseTypeListCollapsed="true">
-    <Position X="3" Y="2.5" Width="1.5" />
+  <Class Name="CustomHost.StartupImplementation" BaseTypeListCollapsed="true">
+    <Position X="7.75" Y="4.75" Width="2.75" />
     <TypeIdentifier>
       <HashCode>AAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAACAAAAAA=</HashCode>
       <FileName>StartupImplementation.cs</FileName>
     </TypeIdentifier>
-    <Lollipop Position="0.2" Collapsed="true" />
+    <Lollipop Orientation="Left" Position="0.1" Collapsed="true" />
   </Class>
-  <Interface Name="CustomHost.Internal.IServiceHost" Collapsed="true">
-    <Position X="1.25" Y="3.75" Width="1.5" />
+  <Interface Name="CustomHost.Internal.IServiceHost">
+    <Position X="4.5" Y="0.5" Width="2.5" />
     <TypeIdentifier>
       <HashCode>AAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAI=</HashCode>
       <FileName>Internal\IServiceHost.cs</FileName>
     </TypeIdentifier>
   </Interface>
-  <Interface Name="CustomHost.Internal.IServiceHostBuilder" Collapsed="true">
-    <Position X="3" Y="3.75" Width="1.5" />
+  <Interface Name="CustomHost.Internal.IServiceHostBuilder">
+    <Position X="1.25" Y="0.5" Width="2.5" />
     <TypeIdentifier>
       <HashCode>AAAAAAAQAAAAAAAAAAAAAAAAAAAAgAAAAAAACAAAAAA=</HashCode>
       <FileName>Internal\IServiceHostBuilder.cs</FileName>
     </TypeIdentifier>
   </Interface>
-  <Interface Name="CustomHost.Startup.IStartup" Collapsed="true">
-    <Position X="4.75" Y="3.75" Width="1.5" />
+  <Interface Name="CustomHost.Startup.IStartup">
+    <Position X="7.75" Y="0.5" Width="2.75" />
     <TypeIdentifier>
       <HashCode>AAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAACAAAAAA=</HashCode>
       <FileName>Startup\IStartup.cs</FileName>
