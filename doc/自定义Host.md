@@ -202,4 +202,11 @@ namespace CustomHost.Internal.Implementation
 
 `_builder`包含了`ServiceHostBuilder`方法`RegisterServices(Action<IServiceCollection> configureServices)`注册的服务。
 
-`_hostingServiceProvider`为包含了`ServiceHostBuilder`方法`ConfigureServices(Action<IServiceCollection> configureServices)`注册的服务的IOC容器实例。
+`_hostingServiceProvider`为包含了`ServiceHostBuilder`方法`ConfigureServices(Action<IServiceCollection> configureServices)`注册的服务的IOC容器实例(可取到相应服务实例)。
+
+`_applicationServices`为包含了`ServiceHostBuilder`方法`RegisterServices(Action<IServiceCollection> configureServices)`与`IStartup`方法`ConfigureServices(IServiceCollection services)`注册的服务的IOC容器实例。
+
+调用过程：
+
+* `Initialize`，赋值`_applicationServices`。
+ * `BuildApplication`，返回`_builder`方法`BuildServiceProvider`生成的`IServiceProvider`实例。
