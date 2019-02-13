@@ -4,9 +4,7 @@ using CustomHost.Startup;
 using CustomHost.Startup.Implementation;
 using Microsoft.Extensions.DependencyInjection;
 using System;
-using System.Collections.Generic;
 using System.Reflection;
-using System.Text;
 
 namespace CustomHost
 {
@@ -14,8 +12,6 @@ namespace CustomHost
     {
         public static IServiceHostBuilder UseStartup(this IServiceHostBuilder hostBuilder, Type startupType)
         {
-            var startupAssemblyName = startupType.GetTypeInfo().Assembly.GetName().Name;
-
             return hostBuilder
                 .ConfigureServices(services =>
                 {

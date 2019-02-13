@@ -212,3 +212,65 @@ namespace CustomHost.Internal.Implementation
  * `BuildApplication`，返回`_builder`方法`BuildServiceProvider`生成的`IServiceProvider`实例。
    * `EnsureApplicationServices`，从`_hostingServiceProvider`取出`IStartup`服务。执行`IStartup`的`ConfigureServices`方法，返回`IServiceProvider`实例，并赋值给`_applicationServices`。
    * 如果`_applicationServices`没有被赋值，调用`_builder`方法`BuildServiceProvider`赋值。执行`IStartup`实例的`Configure`方法，`_applicationServices`作为参数。
+
+### 扩展方法UseStartup
+
+`Startup`可以实现`IStartup`，也可以不实现，但必须具备`ConfigureServices(IServiceCollection services)`与`Configure(IServiceProvider app)`方法。
+
+```csharp
+using CustomHost.Internal;
+using CustomHost.Internal.Implementation;
+using CustomHost.Startup;
+using CustomHost.Startup.Implementation;
+using Microsoft.Extensions.DependencyInjection;
+using System;
+using System.Reflection;
+
+namespace CustomHost
+{
+    public static class ServiceHostBuilderExtensions
+    {
+        public static IServiceHostBuilder UseStartup(this IServiceHostBuilder hostBuilder, Type startupType)
+        {
+            return hostBuilder
+                .ConfigureServices(services =>
+                {
+                    if (typeof(IStartup).GetTypeInfo().IsAssignableFrom(startupType.GetTypeInfo()))
+                    {
+                        services.AddSingleton(typeof(IStartup), startupType);
+                    }
+                    else
+                    {
+                        services.AddSingleton(typeof(IStartup), sp =>
+                        {
+                            return new ConventionBasedStartup(StartupLoader.LoadMethods(sp, startupType, ""));
+                        });
+
+                    }
+                });
+        }
+
+        public static IServiceHostBuilder UseStartup<TStartup>(this IServiceHostBuilder hostBuilder) where TStartup : class
+        {
+            return hostBuilder.UseStartup(typeof(TStartup));
+        }
+    }
+}
+
+```
+```csharp
+public class StartupImplementation: IStartup
+{
+    public IServiceProvider ConfigureServices(IServiceCollection services)
+    {
+        //services.AddScoped<MyService>();
+        return services.BuildServiceProvider();
+    }
+
+    public void Configure(IServiceProvider app)
+    {
+        var myService = app.GetService<MyService>();
+        myService.WriteMessage("This is a message");
+    }
+}
+```
