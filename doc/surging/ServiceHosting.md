@@ -1,0 +1,1 @@
+[自定义Host](/自定义Host)就是根据`Surging.Core.ServiceHosting`去掉`autofac`依赖修改来的。
