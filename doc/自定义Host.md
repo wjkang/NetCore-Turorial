@@ -210,3 +210,5 @@ namespace CustomHost.Internal.Implementation
 
 * `Initialize`，赋值`_applicationServices`。
  * `BuildApplication`，返回`_builder`方法`BuildServiceProvider`生成的`IServiceProvider`实例。
+   * `EnsureApplicationServices`，从`_hostingServiceProvider`取出`IStartup`服务。执行`IStartup`的`ConfigureServices`方法，返回`IServiceProvider`实例，并赋值给`_applicationServices`。
+   * 如果`_applicationServices`没有被赋值，调用`_builder`方法`BuildServiceProvider`赋值。执行`IStartup`实例的`Configure`方法，`_applicationServices`作为参数。
