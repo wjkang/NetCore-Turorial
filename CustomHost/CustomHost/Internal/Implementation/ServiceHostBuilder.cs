@@ -8,11 +8,12 @@ namespace CustomHost.Internal.Implementation
     {
         private readonly List<Action<IServiceCollection>> _configureServicesDelegates;
         private readonly List<Action<IServiceCollection>> _registerServicesDelegates;
-
+        private readonly List<Action<IServiceProvider>> _mapServicesDelegates;
         public ServiceHostBuilder()
         {
             _configureServicesDelegates = new List<Action<IServiceCollection>>();
             _registerServicesDelegates = new List<Action<IServiceCollection>>();
+            _mapServicesDelegates = new List<Action<IServiceProvider>>();
         }
 
         public IServiceHost Build()
@@ -20,7 +21,7 @@ namespace CustomHost.Internal.Implementation
             var services = BuildCommonServices();
             var hostingServices = RegisterServices();
             var hostingServiceProvider = services.BuildServiceProvider();
-            var host = new ServiceHost(hostingServices, hostingServiceProvider);
+            var host = new ServiceHost(hostingServices, hostingServiceProvider, _mapServicesDelegates);
             host.Initialize();
             return host;
         }
@@ -42,6 +43,16 @@ namespace CustomHost.Internal.Implementation
                 throw new ArgumentNullException(nameof(configureServices));
             }
             _registerServicesDelegates.Add(configureServices);
+            return this;
+        }
+
+        public IServiceHostBuilder MapServices(Action<IServiceProvider> mapper)
+        {
+            if (mapper == null)
+            {
+                throw new ArgumentNullException(nameof(mapper));
+            }
+            _mapServicesDelegates.Add(mapper);
             return this;
         }
 

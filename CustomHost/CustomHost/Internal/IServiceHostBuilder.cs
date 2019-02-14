@@ -8,5 +8,6 @@ namespace CustomHost.Internal
         IServiceHost Build();
         IServiceHostBuilder RegisterServices(Action<IServiceCollection> configureServices);
         IServiceHostBuilder ConfigureServices(Action<IServiceCollection> configureServices);
+        IServiceHostBuilder MapServices(Action<IServiceProvider> mapper);
     }
 }

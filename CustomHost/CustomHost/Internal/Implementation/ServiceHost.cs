@@ -1,6 +1,7 @@
 ﻿using CustomHost.Startup;
 using Microsoft.Extensions.DependencyInjection;
 using System;
+using System.Collections.Generic;
 
 namespace CustomHost.Internal.Implementation
 {
@@ -10,10 +11,12 @@ namespace CustomHost.Internal.Implementation
         private IStartup _startup;
         private IServiceProvider _applicationServices;
         private readonly IServiceProvider _hostingServiceProvider;
-        public ServiceHost(IServiceCollection serviceCollection, IServiceProvider hostingServiceProvider)
+        private readonly List<Action<IServiceProvider>> _mapServicesDelegates;
+        public ServiceHost(IServiceCollection serviceCollection, IServiceProvider hostingServiceProvider, List<Action<IServiceProvider>> mapServicesDelegate)
         {
             _builder = serviceCollection;
             _hostingServiceProvider = hostingServiceProvider;
+            _mapServicesDelegates = mapServicesDelegate;
         }
 
         public void Dispose()
@@ -32,6 +35,8 @@ namespace CustomHost.Internal.Implementation
 
         public IDisposable Run()
         {
+            if (_applicationServices != null)
+                MapperServices(_applicationServices);
             return this;
         }
 
@@ -67,6 +72,13 @@ namespace CustomHost.Internal.Implementation
             {
                 Console.Out.WriteLine("应用程序启动异常: " + ex.ToString());
                 throw;
+            }
+        }
+        private void MapperServices(IServiceProvider mapper)
+        {
+            foreach (var mapServices in _mapServicesDelegates)
+            {
+                mapServices(mapper);
             }
         }
     }
