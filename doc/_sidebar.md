@@ -15,3 +15,4 @@
 - [自定义Host](/自定义Host.md)
 - Surging
  - [Surging.Core.ServiceHosting](surging/ServiceHosting.md)
+ - [Surging.Core.ProxyGenerator](surging/ProxyGenerator.md)
