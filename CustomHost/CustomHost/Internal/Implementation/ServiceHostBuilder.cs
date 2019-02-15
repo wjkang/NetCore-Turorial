@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace CustomHost.Internal.Implementation
@@ -9,6 +10,7 @@ namespace CustomHost.Internal.Implementation
         private readonly List<Action<IServiceCollection>> _configureServicesDelegates;
         private readonly List<Action<IServiceCollection>> _registerServicesDelegates;
         private readonly List<Action<IServiceProvider>> _mapServicesDelegates;
+        private readonly List<Action<IConfigurationBuilder>> _configureDelegates;
         public ServiceHostBuilder()
         {
             _configureServicesDelegates = new List<Action<IServiceCollection>>();
@@ -19,6 +21,8 @@ namespace CustomHost.Internal.Implementation
         public IServiceHost Build()
         {
             var services = BuildCommonServices();
+            var config = Configure();
+            services.AddSingleton(typeof(IConfigurationBuilder), config);
             var hostingServices = RegisterServices();
             var hostingServiceProvider = services.BuildServiceProvider();
             var host = new ServiceHost(hostingServices, hostingServiceProvider, _mapServicesDelegates);
@@ -56,6 +60,11 @@ namespace CustomHost.Internal.Implementation
             return this;
         }
 
+        public IServiceHostBuilder Configure(Action<IConfigurationBuilder> builder)
+        {
+            throw new NotImplementedException();
+        }
+
         private IServiceCollection BuildCommonServices()
         {
             var services = new ServiceCollection();
@@ -73,6 +82,16 @@ namespace CustomHost.Internal.Implementation
                 registerServices(hostingServices);
             }
             return hostingServices;
+        }
+
+        private IConfigurationBuilder Configure()
+        {
+            var config = new ConfigurationBuilder().SetBasePath(AppContext.BaseDirectory);
+            foreach (var configure in _configureDelegates)
+            {
+                configure(config);
+            }
+            return config;
         }
     }
 }
