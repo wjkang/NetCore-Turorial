@@ -195,7 +195,7 @@ public static IServiceBuilder AddClientProxy(this IServiceBuilder builder)
 }
 ```
 
-经过上文的分析，已经知道`IServiceBuilder`实例是如何产生的，以及其中的属性`Services`就是`ContainerBuilder`实例。
+经过上文的分析，已经知道`IServiceBuilder`实例是如何产生的，以及其中的属性`Services`就是`ContainerBuilder`实例，整个应用的服务都会往里注册。
 
 
 
