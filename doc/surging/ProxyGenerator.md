@@ -179,7 +179,23 @@ surging 中很多`ServiceBuilder`的扩展方法都是调`ServiceBuilder`属性�
 
 ### 继续ServiceProxyFactory
 
+```csharp
+public static IServiceBuilder AddClientProxy(this IServiceBuilder builder)
+{
+    var services = builder.Services;
+    services.RegisterType<ServiceProxyGenerater>().As<IServiceProxyGenerater>().SingleInstance();
+    services.RegisterType<ServiceProxyProvider>().As<IServiceProxyProvider>().SingleInstance();
+    builder.Services.Register(provider =>new ServiceProxyFactory(
+            provider.Resolve<IRemoteInvokeService>(),
+            provider.Resolve<ITypeConvertibleService>(),
+            provider.Resolve<IServiceProvider>(),
+            builder.GetInterfaceService()
+            )).As<IServiceProxyFactory>().SingleInstance();
+    return builder;
+}
+```
 
+经过上文的分析，已经知道`IServiceBuilder`实例是如何产生的，以及其中的属性`Services`就是`ContainerBuilder`实例。
 
 
 
