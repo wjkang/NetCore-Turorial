@@ -378,6 +378,8 @@ public IEnumerable<Type> GenerateProxys(IEnumerable<Type> interfacTypes)
 
 >构建代码树，动态编译，使用的是[roslyn](https://github.com/dotnet/roslyn)相关API，一个根据现成代码转成代码树的[在线工具](http://roslynquoter.azurewebsites.net/)，一个[roslyn简单例子](https://dev.tencent.com/u/jaycewu/p/RoslynTest/git/tree/master/src/01)。
 
+下面是surging中动态生成的代理服务例子：
+
 ```csharp
 using System;
 using System.Threading.Tasks;
