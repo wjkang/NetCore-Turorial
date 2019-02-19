@@ -300,7 +300,83 @@ public static IServiceBuilder AddCoreService(this ContainerBuilder services)
 **Surging.IModuleServices.Common.IUserService.Authentication_requestData**
 
 
+`ServiceProxyGenerater`中通过`GenerateProxyTree`方法生成服务代理代码树。
+```csharp
+public SyntaxTree GenerateProxyTree(Type interfaceType)
+{
+    var className = interfaceType.Name.StartsWith("I") ? interfaceType.Name.Substring(1) : interfaceType.Name;
+    className += "ClientProxy";
 
+    var members = new List<MemberDeclarationSyntax>
+    {
+        GetConstructorDeclaration(className)
+    };
+
+    members.AddRange(GenerateMethodDeclarations(interfaceType.GetMethods()));
+    return CompilationUnit()
+        .WithUsings(GetUsings())
+        .WithMembers(
+            SingletonList<MemberDeclarationSyntax>(
+                NamespaceDeclaration(
+                    QualifiedName(
+                        QualifiedName(
+                            IdentifierName("Surging"),
+                            IdentifierName("Cores")),
+                        IdentifierName("ClientProxys")))
+        .WithMembers(
+            SingletonList<MemberDeclarationSyntax>(
+                ClassDeclaration(className)
+                    .WithModifiers(TokenList(Token(SyntaxKind.PublicKeyword)))
+                    .WithBaseList(
+                        BaseList(
+                            SeparatedList<BaseTypeSyntax>(
+                                new SyntaxNodeOrToken[]
+                                {
+                                    SimpleBaseType(IdentifierName("ServiceProxyBase")),
+                                    Token(SyntaxKind.CommaToken),
+                                    SimpleBaseType(GetQualifiedNameSyntax(interfaceType))
+                                })))
+                    .WithMembers(List(members))))))
+        .NormalizeWhitespace().SyntaxTree;
+}
+```
+传入需要代理的接口，返回实现的代理服务的代码树。
+
+`GenerateProxys`方法，使用生成的代码树，动态编译，得到服务代理实现。
+```csharp
+public IEnumerable<Type> GenerateProxys(IEnumerable<Type> interfacTypes)
+{
+#if NET
+    var assemblys = AppDomain.CurrentDomain.GetAssemblies();
+#else
+    var assemblys = DependencyContext.Default.RuntimeLibraries.SelectMany(i => i.GetDefaultAssemblyNames(DependencyContext.Default).Select(z => Assembly.Load(new AssemblyName(z.Name))));
+#endif
+    assemblys = assemblys.Where(i => i.IsDynamic == false).ToArray();
+    var trees = interfacTypes.Select(p=>GenerateProxyTree(p)).ToList();
+    var stream = CompilationUtilitys.CompileClientProxy(trees,
+        assemblys
+            .Select(a => MetadataReference.CreateFromFile(a.Location))
+            .Concat(new[]
+            {
+                MetadataReference.CreateFromFile(typeof(Task).GetTypeInfo().Assembly.Location)
+            }),
+        _logger);
+
+    using (stream)
+    {
+#if NET
+        var assembly = Assembly.Load(stream.ToArray());
+#else
+        var assembly = AssemblyLoadContext.Default.LoadFromStream(stream);
+#endif
+
+        return assembly.GetExportedTypes();
+    }
+}
+```
+期间还调用了`CompilationUtilitys.CompileClientProxy`方法。
+
+>构建代码树，动态编译，使用的是[roslyn](https://github.com/dotnet/roslyn)相关API，一个根据现成代码转成代码树的[在线工具](http://roslynquoter.azurewebsites.net/)，一个[roslyn简单例子](https://dev.tencent.com/u/jaycewu/p/RoslynTest/git/tree/master/src/01)。
 
 ```csharp
 using System;
