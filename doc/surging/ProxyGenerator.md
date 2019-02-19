@@ -197,5 +197,224 @@ public static IServiceBuilder AddClientProxy(this IServiceBuilder builder)
 
 经过上文的分析，已经知道`IServiceBuilder`实例是如何产生的，以及其中的属性`Services`就是`ContainerBuilder`实例，整个应用的服务都会往里注册。
 
+以委托的方式注册`IServiceProxyFactory`服务，当获取服务的时候，调用委托实例化`ServiceProxyFactory`，分别取出`IRemoteInvokeService`，`ITypeConvertibleService`，`IServiceProvider`服务，作为`ServiceProxyFactory`构造函数参数。
+
+>`IServiceProvider`不需要注册，autofac会默认生成，直接从IOC容器取出即可。
+
+`GetInterfaceService`方法会扫描全部程序集，获取继承了`IServiceKey`接口，并且类型为接口类型的类型。后续会使用这些接口类型创建RPC代理服务。
+
+```csharp
+public ServiceProxyFactory(IRemoteInvokeService remoteInvokeService, ITypeConvertibleService typeConvertibleService,
+            IServiceProvider serviceProvider, IEnumerable<Type> types)
+{
+    _remoteInvokeService = remoteInvokeService;
+    _typeConvertibleService = typeConvertibleService;
+    _serviceProvider = serviceProvider;
+    if (types != null)
+        _serviceTypes = _serviceProvider.GetService<IServiceProxyGenerater>().GenerateProxys(types).ToArray();
+}
+```
+前三个参数赋值给`ServiceProxyFactory`内的三个属性，会面用到的时候再说。
+
+如果`types`不为空，就需要创建代理服务。创建代理服务需要调用`IServiceProxyGenerater`的`GenerateProxys`方法。
+
+### IServiceProxyGenerater
+`IServiceProxyGenerater.cs`
+```csharp
+using Microsoft.CodeAnalysis;
+using System;
+using System.Collections.Generic;
+
+namespace Surging.Core.ProxyGenerator
+{
+    /// <summary>
+    /// 一个抽象的服务代理生成器。
+    /// </summary>
+    public interface IServiceProxyGenerater
+    {
+        /// <summary>
+        /// 生成服务代理。
+        /// </summary>
+        /// <param name="interfacTypes">需要被代理的接口类型。</param>
+        /// <returns>服务代理实现。</returns>
+        IEnumerable<Type> GenerateProxys(IEnumerable<Type> interfacTypes);
+
+        /// <summary>
+        /// 生成服务代理代码树。
+        /// </summary>
+        /// <param name="interfaceType">需要被代理的接口类型。</param>
+        /// <returns>代码树。</returns>
+        SyntaxTree GenerateProxyTree(Type interfaceType);
+    }
+}
+```
+`IServiceProxyGenerater`服务是与`IServiceProxyFactory`服务同时注册的：
+```csharp
+public static IServiceBuilder AddClientProxy(this IServiceBuilder builder)
+{
+    var services = builder.Services;
+    services.RegisterType<ServiceProxyGenerater>().As<IServiceProxyGenerater>().SingleInstance();
+    services.RegisterType<ServiceProxyProvider>().As<IServiceProxyProvider>().SingleInstance();
+    builder.Services.Register(provider =>new ServiceProxyFactory(
+            provider.Resolve<IRemoteInvokeService>(),
+            provider.Resolve<ITypeConvertibleService>(),
+            provider.Resolve<IServiceProvider>(),
+            builder.GetInterfaceService()
+            )).As<IServiceProxyFactory>().SingleInstance();
+    return builder;
+}
+```
+
+### ServiceProxyGenerater
+
+`ServiceProxyGenerater`需要注入`IServiceIdGenerator`服务与`ILogger`服务。
+```csharp
+public ServiceProxyGenerater(IServiceIdGenerator serviceIdGenerator, ILogger<ServiceProxyGenerater> logger)
+{
+    _serviceIdGenerator = serviceIdGenerator;
+    _logger = logger;
+}
+```
+`IServiceIdGenerator`服务是在Surging.Core.CPlatform ContainerBuilderExtensions.cs 方法`AddCoreService`中注册的。
+```csharp
+public static IServiceBuilder AddCoreService(this ContainerBuilder services)
+{
+    Check.NotNull(services, "services");
+    services.RegisterType<DefaultServiceIdGenerator>().As<IServiceIdGenerator>().SingleInstance();
+    services.Register(p => new CPlatformContainer(p));
+    services.RegisterType(typeof(DefaultTypeConvertibleProvider)).As(typeof(ITypeConvertibleProvider)).SingleInstance();
+    services.RegisterType(typeof(DefaultTypeConvertibleService)).As(typeof(ITypeConvertibleService)).SingleInstance();
+    services.RegisterType(typeof(AuthorizationAttribute)).As(typeof(IAuthorizationFilter)).SingleInstance();
+    services.RegisterType(typeof(AuthorizationAttribute)).As(typeof(IFilter)).SingleInstance();
+    services.RegisterType(typeof(DefaultServiceRouteProvider)).As(typeof(IServiceRouteProvider)).SingleInstance();
+    services.RegisterType(typeof(DefaultServiceRouteFactory)).As(typeof(IServiceRouteFactory)).SingleInstance();
+    services.RegisterType(typeof(DefaultServiceSubscriberFactory)).As(typeof(IServiceSubscriberFactory)).SingleInstance();
+    return new ServiceBuilder(services)
+        .AddJsonSerialization()
+        .UseJsonCodec();
+
+}
+```
+实现为`DefaultServiceIdGenerator`，只有一个方法`GenerateServiceId`，返回字符串，调用的结果例子为
+
+**Surging.IModuleServices.Common.IUserService.Authentication_requestData**
+
+
+
+
+```csharp
+using System;
+using System.Threading.Tasks;
+using System.Collections.Generic;
+using Surging.Core.CPlatform.Convertibles;
+using Surging.Core.CPlatform.Runtime.Client;
+using Surging.Core.CPlatform;
+using Surging.Core.CPlatform.Serialization;
+using Surging.Core.ProxyGenerator.Implementation;
+namespace Surging.Cores.ClientProxys 
+{
+	public class UserServiceClientProxy : ServiceProxyBase, Surging.IModuleServices.Common.IUserService 
+	{
+		public UserServiceClientProxy(IRemoteInvokeService remoteInvokeService, ITypeConvertibleService typeConvertibleService, String serviceKey, CPlatformContainer serviceProvider): base (remoteInvokeService, typeConvertibleService, serviceKey, serviceProvider) 
+		{
+		}
+		public async Task<Surging.IModuleServices.Common.Models.UserModel> Authentication(Surging.IModuleServices.Common.Models.AuthenticationRequestData requestData) 
+		{
+			return await Invoke<Surging.IModuleServices.Common.Models.UserModel>(new Dictionary<string, object> 
+			{ 
+				{
+					"requestData", requestData
+				}
+			}
+			, "Surging.IModuleServices.Common.IUserService.Authentication_requestData");
+		}
+		public async Task<System.String> GetUserName(System.Int32 id) 
+		{
+			return await Invoke<System.String>(new Dictionary<string, object> 
+			{ 
+				{
+					"id", id
+				}
+			}
+			, "Surging.IModuleServices.Common.IUserService.GetUserName_id");
+		}
+		public async Task<System.boolean> Exists(System.Int32 id) 
+		{
+			return await Invoke<System.boolean>(new Dictionary<string, object>{{"id", id}}, "Surging.IModuleServices.Common.IUserService.Exists_id");
+		}
+		public async Task<Surging.IModuleServices.Common.Models.IdentityUser> Save(Surging.IModuleServices.Common.Models.IdentityUser requestData) 
+		{
+			return await Invoke<Surging.IModuleServices.Common.Models.IdentityUser>(new Dictionary<string, object> 
+			{ 
+				{
+					"requestData", requestData
+				}
+			}
+			, "Surging.IModuleServices.Common.IUserService.Save_requestData");
+		}
+		public async Task<System.Int32> GetUserId(System.String userName) 
+		{
+			return await Invoke<System.Int32>(new Dictionary<string, object> 
+			{ 
+				{
+					"userName", userName
+				}
+			}
+			, "Surging.IModuleServices.Common.IUserService.GetUserId_userName");
+		}
+		public async Task<System.DateTime> GetUserLastSignInTime(System.Int32 id) 
+		{
+			return await Invoke<System.DateTime>(new Dictionary<string, object> 
+			{ 
+				{
+					"id", id
+				}
+			}
+			, "Surging.IModuleServices.Common.IUserService.GetUserLastSignInTime_id");
+		}
+		public async Task<Surging.IModuleServices.Common.Models.UserModel> GetUser(Surging.IModuleServices.Common.Models.UserModel user) 
+		{
+			return await Invoke<Surging.IModuleServices.Common.Models.UserModel>(new Dictionary<string, object> 
+			{ 
+				{
+					"user", user
+				}
+			}
+			, "Surging.IModuleServices.Common.IUserService.GetUser_user");
+		}
+		public async Task<System.boolean> Update(System.Int32 id, Surging.IModuleServices.Common.Models.UserModel model) 
+		{
+			return await Invoke<System.boolean>(new Dictionary<string, object>{{"id", id}, {"model", model}}, "Surging.IModuleServices.Common.IUserService.Update_id_model");
+		}
+		public async Task<System.boolean> Get(List<Surging.IModuleServices.Common.Models.UserModel> users) 
+		{
+			return await Invoke<System.boolean>(new Dictionary<string, object>{{"users", users}}, "Surging.IModuleServices.Common.IUserService.Get_users");
+		}
+		public async Task<System.boolean> GetDictionary() 
+		{
+			return await Invoke<System.boolean>(new Dictionary<string, object>{}, "Surging.IModuleServices.Common.IUserService.GetDictionary");
+		}
+		public async System.Threading.Tasks.Task TryThrowException() 
+		{
+			await Invoke(new Dictionary<string, object> 
+			{
+			}
+			, "Surging.IModuleServices.Common.IUserService.TryThrowException");
+		}
+		public async System.Threading.Tasks.Task PublishThroughEventBusAsync(Surging.Core.CPlatform.EventBus.Events.IntegrationEvent evt) 
+		{
+			await Invoke(new Dictionary<string, object> 
+			{ 
+				{
+					"evt", evt
+				}
+			}
+			, "Surging.IModuleServices.Common.IUserService.PublishThroughEventBusAsync_evt");
+		}
+	}
+}
+```
+
+
 
 
