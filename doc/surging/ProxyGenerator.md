@@ -511,8 +511,54 @@ using System.Runtime.Versioning;
 实现的方法中，都是调用基类的`Invoke`方法。后面再分析Invoke的实现，接着回到`ServiceProxyFactory`，分析生成代理服务后的操作。
 
 ### 回到ServiceProxyFactory
+生成服务代理实现后，会赋值给`_serviceTypes`属性。
 
+```csharp
+_serviceTypes = _serviceProvider.GetService<IServiceProxyGenerater>().GenerateProxys(types).ToArray();
+```
 
+代理调用测试：
+```csharp
+var serviceProxyFactory = ServiceLocator.GetService<IServiceProxyFactory>();
+var userProxy = serviceProxyFactory.CreateProxy<IUserService>("User");
+var userId = userProxy.GetUserId("fanly").GetAwaiter().GetResult();
+```
 
+`CreateProxy<IUserService>("User")`声明实现：
+```csharp
+public T CreateProxy<T>(string key) where T:class
+{
+    var instanceType = typeof(T);
+    var instance = ServiceResolver.Current.GetService(instanceType, key);
+    if (instance == null)
+    {
+        var proxyType = _serviceTypes.Single(typeof(T).GetTypeInfo().IsAssignableFrom);
+            instance = proxyType.GetTypeInfo().GetConstructors().First().Invoke(new object[] { _remoteInvokeService, _typeConvertibleService,key,
+        _serviceProvider.GetService<CPlatformContainer>() });
+        ServiceResolver.Current.Register(key, instance, instanceType);
+    }
+    return instance as T;
+}
+```
 
+尝试从自建的IOC容器中取出服务实例，`GetService`实现：
 
+`Surging.Core.CPlatform.DependencyResolution ServiceResolver.cs`
+```csharp
+...
+private static readonly ServiceResolver _defaultInstance = new ServiceResolver();
+private readonly ConcurrentDictionary<ValueTuple<Type, string>, object> _initializers =
+            new ConcurrentDictionary<ValueTuple<Type, string>, object>();
+...
+public static ServiceResolver Current
+{
+    get { return _defaultInstance; }
+}
+...
+public virtual object GetService(Type type, object key)
+{
+    object result;
+    _initializers.TryGetValue(ValueTuple.Create(type, key == null ? null : key.ToString()), out result);
+    return result;
+}
+```
