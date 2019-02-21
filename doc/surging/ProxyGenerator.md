@@ -562,3 +562,15 @@ public virtual object GetService(Type type, object key)
     return result;
 }
 ```
+IOC容器中未注册实例（缓存），则从`_serviceTypes`中取出实现接口的类型，调用类型的第一个构造函数进行实例化。并将_remoteInvokeService，_typeConvertibleService，key，CPlatformContainer实例作为参数传入。
+
+然后将得到的类型实例缓存到IOC容器中：
+```csharp
+ public virtual void Register(string key, object value,Type type)
+{
+    DebugCheck.NotNull(value);
+    _initializers.GetOrAdd(ValueTuple.Create(type, key), value);
+}
+```
+
+
