@@ -214,7 +214,7 @@ public ServiceProxyFactory(IRemoteInvokeService remoteInvokeService, ITypeConver
         _serviceTypes = _serviceProvider.GetService<IServiceProxyGenerater>().GenerateProxys(types).ToArray();
 }
 ```
-前三个参数赋值给`ServiceProxyFactory`内的三个属性，会面用到的时候再说。
+前三个参数赋值给`ServiceProxyFactory`内的三个属性，后面用到的时候再说。
 
 如果`types`不为空，就需要创建代理服务。创建代理服务需要调用`IServiceProxyGenerater`的`GenerateProxys`方法。
 
@@ -394,7 +394,15 @@ namespace Surging.Cores.ClientProxys
 {
     public class UserServiceClientProxy : ServiceProxyBase, Surging.IModuleServices.Common.IUserService
     {
-        public UserServiceClientProxy(IRemoteInvokeService remoteInvokeService, ITypeConvertibleService typeConvertibleService, String serviceKey, CPlatformContainer serviceProvider) : base(remoteInvokeService, typeConvertibleService, serviceKey, serviceProvider)
+        public UserServiceClientProxy(
+            IRemoteInvokeService remoteInvokeService, 
+            ITypeConvertibleService typeConvertibleService, 
+            String serviceKey, 
+            CPlatformContainer serviceProvider) : base(
+                remoteInvokeService, 
+                typeConvertibleService, 
+                serviceKey, 
+                serviceProvider)
         {
         }
         public async Task<Surging.IModuleServices.Common.Models.UserModel> Authentication(Surging.IModuleServices.Common.Models.AuthenticationRequestData requestData)
@@ -573,4 +581,71 @@ IOC容器中未注册实例（缓存），则从`_serviceTypes`中取出实现�
 }
 ```
 
+_remoteInvokeService，_typeConvertibleService，_serviceProvider是通过ServiceProxyFactory构造函数传进来赋值的：
+```csharp
+public static IServiceBuilder AddClientProxy(this IServiceBuilder builder)
+{
+    var services = builder.Services;
+    services.RegisterType<ServiceProxyGenerater>().As<IServiceProxyGenerater>().SingleInstance();
+    services.RegisterType<ServiceProxyProvider>().As<IServiceProxyProvider>().SingleInstance();
+    builder.Services.Register(provider =>new ServiceProxyFactory(
+            provider.Resolve<IRemoteInvokeService>(),
+            provider.Resolve<ITypeConvertibleService>(),
+            provider.Resolve<IServiceProvider>(),
+            builder.GetInterfaceService()
+            )).As<IServiceProxyFactory>().SingleInstance();
+    return builder;
+}
+```
 
+`IRemoteInvokeService`服务，是在`AddClientRuntime`方法注册的：
+```csharp
+//Surging.Core.CPlatform ContainerBuilderExtensions.cs
+public static IServiceBuilder AddClientRuntime(this IServiceBuilder builder)
+{
+    var services = builder.Services;
+    services.RegisterType(typeof(DefaultHealthCheckService)).As(typeof(IHealthCheckService)).SingleInstance();
+    services.RegisterType(typeof(DefaultAddressResolver)).As(typeof(IAddressResolver)).SingleInstance();
+    services.RegisterType(typeof(RemoteInvokeService)).As(typeof(IRemoteInvokeService)).SingleInstance();
+    return builder.UseAddressSelector().AddRuntime().AddClusterSupport();
+}
+```
+`ITypeConvertibleService`与`CPlatformContainer`在`AddCoreService`方法注册的：
+```csharp
+public static IServiceBuilder AddCoreService(this ContainerBuilder services)
+{
+    Check.NotNull(services, "services");
+    services.RegisterType<DefaultServiceIdGenerator>().As<IServiceIdGenerator>().SingleInstance();
+    services.Register(p => new CPlatformContainer(p));
+    services.RegisterType(typeof(DefaultTypeConvertibleProvider)).As(typeof(ITypeConvertibleProvider)).SingleInstance();
+    services.RegisterType(typeof(DefaultTypeConvertibleService)).As(typeof(ITypeConvertibleService)).SingleInstance();
+    services.RegisterType(typeof(AuthorizationAttribute)).As(typeof(IAuthorizationFilter)).SingleInstance();
+    services.RegisterType(typeof(AuthorizationAttribute)).As(typeof(IFilter)).SingleInstance();
+    services.RegisterType(typeof(DefaultServiceRouteProvider)).As(typeof(IServiceRouteProvider)).SingleInstance();
+    services.RegisterType(typeof(DefaultServiceRouteFactory)).As(typeof(IServiceRouteFactory)).SingleInstance();
+    services.RegisterType(typeof(DefaultServiceSubscriberFactory)).As(typeof(IServiceSubscriberFactory)).SingleInstance();
+    services.RegisterType(typeof(ServiceTokenGenerator)).As(typeof(IServiceTokenGenerator)).SingleInstance();
+    services.RegisterType(typeof(HashAlgorithm)).As(typeof(IHashAlgorithm)).SingleInstance();
+    return new ServiceBuilder(services)
+        .AddJsonSerialization()
+        .UseJsonCodec();
+
+}
+```
+>CPlatformContainer注册到ContainerBuilder实例里，然后从ContainerBuilder实例可以取到IServiceProvider实例(不需要注册，autofac自动产生)，而IServiceProvider实例中可以取出CPlatformContainer实例，可以认为ContainerBuilder实例中取出的IServiceProvider实例与ContainerBuilder实例是互等的。
+
+调用代理服务实现的构造函数传入的参数其实是传给基类`ServiceProxyBase`的构造函数：
+```csharp
+public UserServiceClientProxy(
+    IRemoteInvokeService remoteInvokeService, 
+    ITypeConvertibleService typeConvertibleService, 
+    String serviceKey, 
+    CPlatformContainer serviceProvider) : base(
+        remoteInvokeService, 
+        typeConvertibleService, 
+        serviceKey, 
+        serviceProvider)
+{
+}
+```
+### ServiceProxyBase
