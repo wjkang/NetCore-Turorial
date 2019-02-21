@@ -649,3 +649,36 @@ public UserServiceClientProxy(
 }
 ```
 ### ServiceProxyBase
+
+生成的代理服务实现中`GetUserName`方法就是调用`ServiceProxyBase`的`Invoke<T>(IDictionary<string, object> parameters, string serviceId)`方法：
+```csharp
+protected async Task<T> Invoke<T>(IDictionary<string, object> parameters, string serviceId)
+{
+    object result = default(T);
+    var command = await _commandProvider.GetCommand(serviceId);
+    RemoteInvokeResultMessage message;
+    var decodeJOject = typeof(T) == UtilityType.ObjectType;
+    if (!command.RequestCacheEnabled || decodeJOject)
+    {
+        var v = typeof(T).FullName;
+        message = await _breakeRemoteInvokeService.InvokeAsync(parameters, serviceId, _serviceKey, decodeJOject);
+        if (message == null)
+        {
+            var invoker = _serviceProvider.GetInstances<IClusterInvoker>(command.Strategy.ToString());
+            return await invoker.Invoke<T>(parameters, serviceId, _serviceKey, typeof(T) == UtilityType.ObjectType);
+        }
+    }
+    else
+    {
+        var invocation = GetInvocation(parameters, serviceId, typeof(T));
+        await _interceptor.Intercept(invocation);
+        message = invocation.ReturnValue is RemoteInvokeResultMessage
+            ? invocation.ReturnValue as RemoteInvokeResultMessage : null;
+        result = invocation.ReturnValue;
+    }
+
+    if (message != null)
+        result = _typeConvertibleService.Convert(message.Result, typeof(T));
+    return (T)result;
+}
+```
