@@ -632,7 +632,62 @@ public static IServiceBuilder AddCoreService(this ContainerBuilder services)
 
 }
 ```
->CPlatformContainer注册到ContainerBuilder实例里，然后从ContainerBuilder实例可以取到IServiceProvider实例(不需要注册，autofac自动产生)，而IServiceProvider实例中可以取出CPlatformContainer实例，可以认为ContainerBuilder实例中取出的IServiceProvider实例与ContainerBuilder实例是互等的。
+>CPlatformContainer注册到ContainerBuilder实例里，然后从ContainerBuilder实例可以取到IServiceProvider实例(不需要注册，autofac自动产生)，之后IServiceProvider实例中可以取出CPlatformContainer实例，可以认为ContainerBuilder实例中取出的IServiceProvider实例与ContainerBuilder实例是互等的。
+
+CPlatformContainer是以委托的方式注册的，实例化的时候会将IComponentContex实例传入构造函数，这个IComponentContex实例就是IOC容器实例。CPlatformContainer的功能就是使用IOC容器实例获取相应的服务。
+```csharp
+using Autofac;
+using Surging.Core.CPlatform.DependencyResolution;
+using System;
+
+namespace Surging.Core.CPlatform
+{
+    public class CPlatformContainer
+    {
+        private readonly IComponentContext _container;
+
+        public IComponentContext Current => _container;
+
+        public CPlatformContainer(IComponentContext container)
+        {
+            this._container = container;
+        }
+        public  T GetInstances<T>(string name) where T : class
+        {
+            return _container.ResolveKeyed<T>(name);
+        }
+
+        public  T GetInstances<T>() where T : class
+        {
+            return _container.Resolve<T>();
+        }
+
+        public object GetInstances(Type type)  
+        {
+            return _container.Resolve(type);
+        }
+
+        public T GetInstances<T>(Type type) where T : class
+        {
+            return _container.Resolve(type) as T;
+        }
+
+        public object GetInstances(string name,Type type)  
+        {
+            // var appConfig = AppConfig.DefaultInstance;
+            var objInstance = ServiceResolver.Current.GetService(type, name);
+            if (objInstance == null)
+            {
+                objInstance = string.IsNullOrEmpty(name) ? GetInstances(type) : _container.ResolveKeyed(name, type);
+                ServiceResolver.Current.Register(name, objInstance, type);
+            }
+            return objInstance;
+        }
+    }
+}
+
+```
+
 
 调用代理服务实现的构造函数传入的参数其实是传给基类`ServiceProxyBase`的构造函数：
 ```csharp
@@ -651,6 +706,18 @@ public UserServiceClientProxy(
 ### ServiceProxyBase
 
 生成的代理服务实现中`GetUserName`方法就是调用`ServiceProxyBase`的`Invoke<T>(IDictionary<string, object> parameters, string serviceId)`方法：
+```csharp
+public async Task<System.String> GetUserName(System.Int32 id)
+{
+    return await Invoke<System.String>(new Dictionary<string, object>
+    {
+        {
+            "id", id
+        }
+    }
+    , "Surging.IModuleServices.Common.IUserService.GetUserName_id");
+}
+```
 ```csharp
 protected async Task<T> Invoke<T>(IDictionary<string, object> parameters, string serviceId)
 {
@@ -682,3 +749,1193 @@ protected async Task<T> Invoke<T>(IDictionary<string, object> parameters, string
     return (T)result;
 }
 ```
+`_commandProvider`是从`CPlatformContainer`取出来的：
+```csharp
+protected ServiceProxyBase(IRemoteInvokeService remoteInvokeService, 
+            ITypeConvertibleService typeConvertibleService,String serviceKey, CPlatformContainer serviceProvider)
+{
+    _remoteInvokeService = remoteInvokeService;
+    _typeConvertibleService = typeConvertibleService;
+    _serviceKey = serviceKey;
+    _serviceProvider = serviceProvider;
+    _commandProvider = serviceProvider.GetInstances<IServiceCommandProvider>();
+    _breakeRemoteInvokeService = serviceProvider.GetInstances<IBreakeRemoteInvokeService>();
+    if(serviceProvider.Current.IsRegistered<IInterceptor>())
+    _interceptor= serviceProvider.GetInstances<IInterceptor>();
+}
+```
+`_serviceProvider`为`CPlatformContainer`实例。
+
+`IServiceCommandProvider`服务注册时机：
+```csharp
+public static IServiceBuilder AddClientRuntime(this IServiceBuilder builder)
+{
+    var services = builder.Services;
+    services.RegisterType(typeof(DefaultHealthCheckService)).As(typeof(IHealthCheckService)).SingleInstance();
+    services.RegisterType(typeof(DefaultAddressResolver)).As(typeof(IAddressResolver)).SingleInstance();
+    services.RegisterType(typeof(RemoteInvokeService)).As(typeof(IRemoteInvokeService)).SingleInstance();
+    return builder.UseAddressSelector().AddRuntime().AddClusterSupport();
+}
+```
+```csharp
+public static IServiceBuilder AddClusterSupport(this IServiceBuilder builder)
+{
+    var services = builder.Services;
+    services.RegisterType(typeof(ServiceCommandProvider)).As(typeof(IServiceCommandProvider)).SingleInstance();
+    services.RegisterType(typeof(BreakeRemoteInvokeService)).As(typeof(IBreakeRemoteInvokeService)).SingleInstance();
+    services.RegisterType(typeof(FailoverInjectionInvoker)).AsImplementedInterfaces()
+        .Named(StrategyType.Injection.ToString(), typeof(IClusterInvoker)).SingleInstance();
+    services.RegisterType(typeof(FailoverHandoverInvoker)).AsImplementedInterfaces()
+    .Named(StrategyType.Failover.ToString(), typeof(IClusterInvoker)).SingleInstance();
+    return builder;
+}
+```
+
+### ServiceCommandProvider
+`_commandProvider.GetCommand(serviceId)`实现：
+```csharp
+...
+private readonly ConcurrentDictionary<string, ServiceCommand> _serviceCommand = new ConcurrentDictionary<string, ServiceCommand>();
+...
+public override ValueTask<ServiceCommand> GetCommand(string serviceId)
+{
+    var result = _serviceCommand.GetValueOrDefault(serviceId);
+    if (result == null)
+    {
+        return new ValueTask<ServiceCommand>(GetCommandAsync(serviceId));
+    }
+    else
+    {
+        return new ValueTask<ServiceCommand>(result);//比Task<ServiceCommand>(result)更少消耗资源
+    }
+}
+```
+如果能从`_serviceCommand`中取出ServiceCommand，就不需要进行异步调用，使用ValueTask不会消耗更多的资源。
+>有关于ValueTask的文章
+
+>[Understanding the Whys, Whats, and Whens of ValueTask](https://devblogs.microsoft.com/dotnet/understanding-the-whys-whats-and-whens-of-valuetask/)
+
+>[Asynchronous Programming in .NET – Benefits and Tradeoffs of Using ValueTask](https://rubikscode.net/2018/06/11/asynchronous-programming-in-net-benefits-and-tradeoffs-of-using-valuetask/)
+
+>[Using the ValueTask of T object in C# 7.0](https://dotnetcodr.com/2018/01/17/using-the-valuetask-of-t-object-in-c-7-0/)
+
+>[Task, Async Await, ValueTask, IValueTaskSource and how to keep your sanity in modern .NET world](https://blog.scooletz.com/2018/05/14/task-async-await-valuetask-ivaluetasksource-and-how-to-keep-your-sanity-in-modern-net-world/)
+
+仔细分析下`GetCommandAsync`方法：
+
+```csharp
+public async Task<ServiceCommand> GetCommandAsync(string serviceId)
+{
+    var result = new ServiceCommand();
+    var manager = _serviceProvider.GetService<IServiceCommandManager>();
+    if (manager == null)
+    {
+        var command = (from q in _serviceEntryManager.GetEntries()
+                        let k = q.Attributes
+                        where k.OfType<CommandAttribute>().Count() > 0 && q.Descriptor.Id == serviceId
+                        select k.OfType<CommandAttribute>().FirstOrDefault()).FirstOrDefault();
+        result = ConvertServiceCommand(command);
+    }
+    else
+    {
+        var commands = await manager.GetServiceCommandsAsync();
+        result = ConvertServiceCommand(commands.Where(p => p.ServiceId == serviceId).FirstOrDefault());
+    }
+    _serviceCommand.AddOrUpdate(serviceId, result, (s, r) => result);
+    return result;
+}
+```
+_serviceProvider是通过构造函数注入并赋值的(autofac自动产生的，不需要注册)。
+
+`IServiceCommandManager`的注册：
+```csharp
+//Surging.Core.CPlatform ContainerBuilderExtensions.cs
+public static IServiceBuilder UseCommandManager(this IServiceBuilder builder, Func<IServiceProvider, IServiceCommandManager> factory)
+{
+    builder.Services.RegisterAdapter(factory).InstancePerLifetimeScope();
+    return builder;
+}
+```
+Surging.Core.Zookeeper ContainerBuilderExtensions.cs
+```csharp
+/// <summary>
+/// 设置服务命令管理者。
+/// </summary>
+/// <param name="builder">Rpc服务构建者。</param>
+/// <param name="configInfo">ZooKeeper设置信息。</param>
+/// <returns>服务构建者。</returns>
+public static IServiceBuilder UseZooKeeperCommandManager(this IServiceBuilder builder, ConfigInfo configInfo)
+{
+    return builder.UseCommandManager(provider =>
+    {
+        var result = new ZookeeperServiceCommandManager(
+            configInfo,
+            provider.GetRequiredService<ISerializer<byte[]>>(),
+            provider.GetRequiredService<ISerializer<string>>(),
+            provider.GetRequiredService<IServiceEntryManager>(),
+            provider.GetRequiredService<ILogger<ZookeeperServiceCommandManager>>());
+        return result;
+    });
+}
+```
+Surging.Core.Consul ContainerBuilderExtensions.cs
+```csharp
+/// <summary>
+/// 设置服务命令管理者。
+/// </summary>
+/// <param name="builder">Rpc服务构建者。</param>
+/// <param name="configInfo">Consul设置信息。</param>
+/// <returns>服务构建者。</returns>
+public static IServiceBuilder UseConsulCommandManager(this IServiceBuilder builder, ConfigInfo configInfo)
+{
+    return builder.UseCommandManager(provider =>
+    {
+        var result = new ConsulServiceCommandManager(
+            configInfo,
+            provider.GetRequiredService<ISerializer<byte[]>>(),
+            provider.GetRequiredService<ISerializer<string>>(),
+            provider.GetRequiredService<IClientWatchManager>(),
+            provider.GetRequiredService<IServiceEntryManager>(),
+            provider.GetRequiredService<ILogger<ConsulServiceCommandManager>>());
+        return result;
+    });
+}
+```
+使用到了Zookeeper和Consul，暂时以`IServiceCommandManager`未注册进行分析，也就是
+```csharp
+...
+var manager = _serviceProvider.GetService<IServiceCommandManager>();
+if (manager == null)
+{
+    var command = (from q in _serviceEntryManager.GetEntries()
+                    let k = q.Attributes
+                    where k.OfType<CommandAttribute>().Count() > 0 && q.Descriptor.Id == serviceId
+                    select k.OfType<CommandAttribute>().FirstOrDefault()).FirstOrDefault();
+    result = ConvertServiceCommand(command);
+}
+...
+```
+`IServiceEntryManager`的注册：
+```csharp
+private static IServiceBuilder AddRuntime(this IServiceBuilder builder)
+{
+    var services = builder.Services;
+
+    services.RegisterType(typeof(ClrServiceEntryFactory)).As(typeof(IClrServiceEntryFactory)).SingleInstance();
+
+    services.Register(provider =>
+    {
+        try
+        {
+            var assemblys = GetReferenceAssembly();
+            var types = assemblys.SelectMany(i => i.ExportedTypes).ToArray();
+            return new AttributeServiceEntryProvider(types, provider.Resolve<IClrServiceEntryFactory>(),
+                    provider.Resolve<ILogger<AttributeServiceEntryProvider>>(), provider.Resolve<CPlatformContainer>());
+        }
+        finally
+        {
+                _referenceAssembly.Clear();
+            builder = null;
+        }
+    }).As<IServiceEntryProvider>();
+    builder.Services.RegisterType(typeof(DefaultServiceEntryManager)).As(typeof(IServiceEntryManager)).SingleInstance();
+    return builder;
+}
+```
+Surging.Core.CPlatform.Runtime.Server.Implementation   DefaultServiceEntryManager.cs
+```csharp
+public DefaultServiceEntryManager(IEnumerable<IServiceEntryProvider> providers)
+{
+    var list = new List<ServiceEntry>();
+    foreach (var provider in providers)
+    {
+        var entries = provider.GetEntries().ToArray();
+        foreach (var entry in entries)
+        {
+            if (list.Any(i => i.Descriptor.Id == entry.Descriptor.Id))
+                throw new InvalidOperationException($"本地包含多个Id为：{entry.Descriptor.Id} 的服务条目。");
+        }
+        list.AddRange(entries);
+    }
+    _serviceEntries = list.ToArray();
+}
+```
+`IServiceEntryProvider`的注册：
+```csharp
+private static IServiceBuilder AddRuntime(this IServiceBuilder builder)
+{
+    var services = builder.Services;
+
+    services.RegisterType(typeof(ClrServiceEntryFactory)).As(typeof(IClrServiceEntryFactory)).SingleInstance();
+
+    services.Register(provider =>
+    {
+        try
+        {
+            var assemblys = GetReferenceAssembly();
+            var types = assemblys.SelectMany(i => i.ExportedTypes).ToArray();
+            return new AttributeServiceEntryProvider(types, provider.Resolve<IClrServiceEntryFactory>(),
+                    provider.Resolve<ILogger<AttributeServiceEntryProvider>>(), provider.Resolve<CPlatformContainer>());
+        }
+        finally
+        {
+                _referenceAssembly.Clear();
+            builder = null;
+        }
+    }).As<IServiceEntryProvider>();
+    builder.Services.RegisterType(typeof(DefaultServiceEntryManager)).As(typeof(IServiceEntryManager)).SingleInstance();
+    return builder;
+}
+```
+调用AttributeServiceEntryProvider构造函数实例化需要传入IClrServiceEntryFactory，IClrServiceEntryFactory也是在此时注册的。
+
+>因为DefaultServiceEntryManager是单例的，所以注入到DefaultServiceEntryManager里的AttributeServiceEntryProvider不会被更新。
+
+不明白以下代码的逻辑：
+```csharp
+finally
+{
+        _referenceAssembly.Clear();
+    builder = null;
+}
+```
+
+### AttributeServiceEntryProvider
+
+```csharp
+using Microsoft.Extensions.Logging;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using Autofac;
+
+namespace Surging.Core.CPlatform.Runtime.Server.Implementation.ServiceDiscovery.Attributes
+{
+    /// <summary>
+    /// Service标记类型的服务条目提供程序。
+    /// </summary>
+    public class AttributeServiceEntryProvider : IServiceEntryProvider
+    {
+        #region Field
+
+        private readonly IEnumerable<Type> _types;
+        private readonly IClrServiceEntryFactory _clrServiceEntryFactory;
+        private readonly ILogger<AttributeServiceEntryProvider> _logger;
+        private readonly CPlatformContainer _serviceProvider;
+
+        #endregion Field
+
+        #region Constructor
+
+        public AttributeServiceEntryProvider(IEnumerable<Type> types, IClrServiceEntryFactory clrServiceEntryFactory, ILogger<AttributeServiceEntryProvider> logger ,CPlatformContainer serviceProvider)
+        {
+            _types = types;
+            _clrServiceEntryFactory = clrServiceEntryFactory;
+            _logger = logger;
+            _serviceProvider = serviceProvider;
+        }
+
+        #endregion Constructor
+
+        #region Implementation of IServiceEntryProvider
+
+        /// <summary>
+        /// 获取服务条目集合。
+        /// </summary>
+        /// <returns>服务条目集合。</returns>
+        public IEnumerable<ServiceEntry> GetEntries()
+        {
+            var services = _types.Where(i =>
+            {
+                var typeInfo = i.GetTypeInfo();
+                return typeInfo.IsInterface && typeInfo.GetCustomAttribute<ServiceBundleAttribute>() != null && _serviceProvider.Current.IsRegistered(i);
+            }).Distinct().ToArray();
+
+            if (_logger.IsEnabled(LogLevel.Information))
+            {
+                _logger.LogInformation($"发现了以下服务：{string.Join(",", services.Select(i => i.ToString()))}。");
+            }
+            var entries = new List<ServiceEntry>();
+            foreach (var service in services)
+            {
+                entries.AddRange( _clrServiceEntryFactory.CreateServiceEntry(service));
+            }
+            return entries;
+        }
+
+        #endregion Implementation of IServiceEntryProvider
+    }
+}
+```
+筛选出标记了`ServiceBundleAttribute`特性的接口，比如
+```csharp
+[ServiceBundle("api/{Service}")]
+public interface IUserService: IServiceKey
+{
+    Task<UserModel> Authentication(AuthenticationRequestData requestData);
+    
+    [Service(Date = "2017-8-11", Director = "fanly", Name = "获取用户")]
+    Task<string> GetUserName(int id);
+    ...
+    [Authorization(AuthType = AuthorizationType.JWT)]
+    [Service(Date = "2017-8-11", Director = "fanly", Name = "获取用户")]
+    [Command(Strategy = StrategyType.Injection, ShuntStrategy = AddressSelectorMode.HashAlgorithm, ExecutionTimeoutInMilliseconds = 1500, BreakerRequestVolumeThreshold = 3, Injection = @"return 1;", RequestCacheEnabled = false)]
+    Task<int> GetUserId(string userName);
+    ...
+}
+```
+然后调用`ClrServiceEntryFactory`方法创建`ServiceEntry`：
+
+### ClrServiceEntryFactory
+```csharp
+using Surging.Core.CPlatform.Convertibles;
+using Surging.Core.CPlatform.DependencyResolution;
+using Surging.Core.CPlatform.Filters.Implementation;
+using Surging.Core.CPlatform.Ids;
+using Surging.Core.CPlatform.Routing.Template;
+using Surging.Core.CPlatform.Runtime.Server.Implementation.ServiceDiscovery.Attributes;
+using Surging.Core.CPlatform.Utilities;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using System.Threading.Tasks;
+using static Surging.Core.CPlatform.Utilities.FastInvoke;
+
+namespace Surging.Core.CPlatform.Runtime.Server.Implementation.ServiceDiscovery.Implementation
+{
+    /// <summary>
+    /// Clr服务条目工厂。
+    /// </summary>
+    public class ClrServiceEntryFactory : IClrServiceEntryFactory
+    {
+        #region Field
+        private readonly CPlatformContainer _serviceProvider;
+        private readonly IServiceIdGenerator _serviceIdGenerator;
+        private readonly ITypeConvertibleService _typeConvertibleService;
+        #endregion Field
+
+        #region Constructor
+        public ClrServiceEntryFactory(CPlatformContainer serviceProvider, IServiceIdGenerator serviceIdGenerator, ITypeConvertibleService typeConvertibleService)
+        {
+            _serviceProvider = serviceProvider;
+            _serviceIdGenerator = serviceIdGenerator;
+            _typeConvertibleService = typeConvertibleService;
+        }
+
+        #endregion Constructor
+
+        #region Implementation of IClrServiceEntryFactory
+
+        /// <summary>
+        /// 创建服务条目。
+        /// </summary>
+        /// <param name="service">服务类型。</param>
+        /// <param name="serviceImplementation">服务实现类型。</param>
+        /// <returns>服务条目集合。</returns>
+        public IEnumerable<ServiceEntry> CreateServiceEntry(Type service)
+        {
+            var routeTemplate = service.GetCustomAttribute<ServiceBundleAttribute>() ;
+            foreach (var methodInfo in service.GetTypeInfo().GetMethods())
+            {
+                yield return Create(methodInfo,service.Name, routeTemplate.RouteTemplate);
+            }
+        }
+        #endregion Implementation of IClrServiceEntryFactory
+
+        #region Private Method
+
+        private ServiceEntry Create(MethodInfo method, string serviceName, string routeTemplate)
+        {
+            var serviceId = _serviceIdGenerator.GenerateServiceId(method);
+            var attributes = method.GetCustomAttributes().ToList();
+            //实例化ServiceDescriptor
+            var serviceDescriptor = new ServiceDescriptor
+            {
+                Id = serviceId,
+                RoutePath = RoutePatternParser.Parse(routeTemplate, serviceName, method.Name)
+            };
+            //读取Service特性(ServiceAttribute继承ServiceDescriptorAttribute)
+            var descriptorAttributes = method.GetCustomAttributes<ServiceDescriptorAttribute>();
+            foreach (var descriptorAttribute in descriptorAttributes)
+            {
+                //执行ServiceAttribute Apply方法，根据ServiceAttribute属性通过ServiceDescriptor扩展方法
+                //设置serviceDescriptor的Metadatas属性
+                descriptorAttribute.Apply(serviceDescriptor);
+            }
+            //读取Authorization特性(Authorization继承AuthorizationFilter)
+            var authorization = attributes.Where(p => p is AuthorizationFilterAttribute).FirstOrDefault();
+            //设置覆盖Service特性EnableAuthorization设置
+            serviceDescriptor.EnableAuthorization(authorization != null);
+            if (authorization != null)
+            {
+                //设置授权类型
+                ;
+                serviceDescriptor.AuthType(((authorization as AuthorizationAttribute)?.AuthType)
+                    ?? AuthorizationType.AppSecret);
+            }
+            var fastInvoker = GetHandler(serviceId, method);
+            return new ServiceEntry
+            {
+                Descriptor = serviceDescriptor,
+                Attributes = attributes,
+                Func = (key, parameters) =>
+             {
+                 var instance = _serviceProvider.GetInstances(key, method.DeclaringType);
+                 var list = new List<object>();
+
+                 foreach (var parameterInfo in method.GetParameters())
+                 {
+                     var value = parameters[parameterInfo.Name];
+                     var parameterType = parameterInfo.ParameterType;
+                     var parameter = _typeConvertibleService.Convert(value, parameterType);
+                     list.Add(parameter);
+                 }
+                 var result = fastInvoker(instance, list.ToArray());
+                 return Task.FromResult(result);
+             }
+            };
+        }
+
+        private FastInvokeHandler GetHandler(string key, MethodInfo method)
+        {
+            var objInstance = ServiceResolver.Current.GetService(null, key);
+            if (objInstance == null)
+            {
+                objInstance = FastInvoke.GetMethodInvoker(method);
+                ServiceResolver.Current.Register(key, objInstance, null);
+            }
+            return objInstance as FastInvokeHandler;
+        }
+        #endregion Private Method
+    }
+}
+```
+以上读取接口特性列表的代码只会在`DefaultServiceEntryManager`实例化的时候调用，就是第一次取出`IServiceEntryManager`服务的时候，`IServiceEntryManager`是以单例方式注册的。
+
+### 回到ServiceCommandProvider
+
+继续分析下面的代码：
+```csharp
+if (manager == null)
+{
+    var command = (from q in _serviceEntryManager.GetEntries()
+                    let k = q.Attributes
+                    where k.OfType<CommandAttribute>().Count() > 0 && q.Descriptor.Id == serviceId
+                    select k.OfType<CommandAttribute>().FirstOrDefault()).FirstOrDefault();
+    result = ConvertServiceCommand(command);
+}
+```
+从`DefaultServiceEntryManager`实例_serviceEntryManager的_serviceEntries属性中(`ServiceEntry`列表)根据条件筛选符合项，然后从符合项的Attributes列表中取出Command特性。
+>Descriptor.Id与serviceId都是由DefaultServiceIdGenerator的方法生成。
+
+使用`ConvertServiceCommand`方法处理Command特性。
+```csharp
+public ServiceCommand ConvertServiceCommand(CommandAttribute command)
+{
+    var result = new ServiceCommand();
+    if (command != null)
+    {
+        result = new ServiceCommand
+        {
+            CircuitBreakerForceOpen = command.CircuitBreakerForceOpen,
+            ExecutionTimeoutInMilliseconds = command.ExecutionTimeoutInMilliseconds,
+            FailoverCluster = command.FailoverCluster,
+            Injection = command.Injection,
+            ShuntStrategy = command.ShuntStrategy,
+            RequestCacheEnabled = command.RequestCacheEnabled,
+            Strategy = command.Strategy,
+            InjectionNamespaces = command.InjectionNamespaces,
+            BreakeErrorThresholdPercentage = command.BreakeErrorThresholdPercentage,
+            BreakerForceClosed = command.BreakerForceClosed,
+            BreakerRequestVolumeThreshold = command.BreakerRequestVolumeThreshold,
+            BreakeSleepWindowInMilliseconds = command.BreakeSleepWindowInMilliseconds,
+            MaxConcurrentRequests = command.MaxConcurrentRequests
+        };
+    }
+    return result;
+}
+```
+然后将结果缓存在_serviceCommand中：`_serviceCommand.AddOrUpdate(serviceId, result, (s, r) => result);`。
+
+### 回到ServiceProxyBase
+继续下面方法的分析：
+```csharp
+/// <summary>
+/// 远程调用。
+/// </summary>
+/// <typeparam name="T">返回类型。</typeparam>
+/// <param name="parameters">参数字典。</param>
+/// <param name="serviceId">服务Id。</param>
+/// <returns>调用结果。</returns>
+protected async Task<T> Invoke<T>(IDictionary<string, object> parameters, string serviceId)
+{
+    object result = default(T);
+    var command = await _commandProvider.GetCommand(serviceId);
+    RemoteInvokeResultMessage message;
+    var decodeJOject = typeof(T) == UtilityType.ObjectType;
+    if (!command.RequestCacheEnabled || decodeJOject)
+    {
+        var v = typeof(T).FullName;
+        message = await _breakeRemoteInvokeService.InvokeAsync(parameters, serviceId, _serviceKey, decodeJOject);
+        if (message == null)
+        {
+            var invoker = _serviceProvider.GetInstances<IClusterInvoker>(command.Strategy.ToString());
+            return await invoker.Invoke<T>(parameters, serviceId, _serviceKey, typeof(T) == UtilityType.ObjectType);
+        }
+    }
+    else
+    {
+        var invocation = GetInvocation(parameters, serviceId, typeof(T));
+        await _interceptor.Intercept(invocation);
+        message = invocation.ReturnValue is RemoteInvokeResultMessage
+            ? invocation.ReturnValue as RemoteInvokeResultMessage : null;
+        result = invocation.ReturnValue;
+    }
+
+    if (message != null)
+        result = _typeConvertibleService.Convert(message.Result, typeof(T));
+    return (T)result;
+}
+```
+经过之前的分析，已经知道如何从`var command = await _commandProvider.GetCommand(serviceId);`中取到ServiceCommand。
+
+如果服务命令没有设置启用缓存，则调用`_breakeRemoteInvokeService.InvokeAsync`，`IBreakeRemoteInvokeService`注册时机：
+```csharp
+/// <summary>
+/// 添加集群支持
+/// </summary>
+/// <param name="builder">服务构建者</param>
+/// <returns>服务构建者。</returns>
+public static IServiceBuilder AddClusterSupport(this IServiceBuilder builder)
+{
+    var services = builder.Services;
+    services.RegisterType(typeof(ServiceCommandProvider)).As(typeof(IServiceCommandProvider)).SingleInstance();
+    services.RegisterType(typeof(BreakeRemoteInvokeService)).As(typeof(IBreakeRemoteInvokeService)).SingleInstance();
+    services.RegisterType(typeof(FailoverInjectionInvoker)).AsImplementedInterfaces()
+        .Named(StrategyType.Injection.ToString(), typeof(IClusterInvoker)).SingleInstance();
+    services.RegisterType(typeof(FailoverHandoverInvoker)).AsImplementedInterfaces()
+    .Named(StrategyType.Failover.ToString(), typeof(IClusterInvoker)).SingleInstance();
+    return builder;
+}
+```
+### BreakeRemoteInvokeService
+```csharp
+public async Task<RemoteInvokeResultMessage> InvokeAsync(IDictionary<string, object> parameters, string serviceId, string serviceKey, bool decodeJOject)
+{
+    //获取服务调用信息，没有则新增
+    var serviceInvokeInfos = _serviceInvokeListenInfo.GetOrAdd(serviceId,
+        new ServiceInvokeListenInfo() { FirstInvokeTime=DateTime.Now,
+        FinalRemoteInvokeTime =DateTime.Now });
+    //获取服务命令
+    var command = await _commandProvider.GetCommand(serviceId);
+    //距离最后一次调用间隔(秒)
+    var intervalSeconds = (DateTime.Now - serviceInvokeInfos.FinalRemoteInvokeTime).TotalSeconds;
+    //是否达到命令配置的信号量最大并发度
+    bool reachConcurrentRequest() => serviceInvokeInfos.ConcurrentRequests > command.MaxConcurrentRequests;
+    //距离最后一次调用间隔是否<=10秒 并且 上次失败后再次调用次数是否大于命令配置的“10秒钟内至少多少请求失败，熔断器才发挥起作用”
+    bool reachRequestVolumeThreshold() => intervalSeconds <= 10
+        && serviceInvokeInfos.SinceFaultRemoteServiceRequests > command.BreakerRequestVolumeThreshold;
+    //错误率
+    bool reachErrorThresholdPercentage() =>
+        serviceInvokeInfos.FaultRemoteServiceRequests / (serviceInvokeInfos.RemoteServiceRequests ?? 1) * 100 > command.BreakeErrorThresholdPercentage;
+    var hashCode = GetHashCode(command,parameters);
+    //强制关闭熔断
+    if (command.BreakerForceClosed)
+    {
+        //更新本地调用次数
+        _serviceInvokeListenInfo.AddOrUpdate(serviceId, new ServiceInvokeListenInfo(), (k, v) => { v.LocalServiceRequests++; return v; });
+        return null;
+    }
+    else
+    {
+        //达到熔断条件
+        if (reachConcurrentRequest() || reachRequestVolumeThreshold() || reachErrorThresholdPercentage())
+        {
+            //熔断后达到重新尝试请求时间
+            if (intervalSeconds * 1000 > command.BreakeSleepWindowInMilliseconds)
+            {
+                return await MonitorRemoteInvokeAsync(parameters, serviceId, serviceKey, decodeJOject, command.ExecutionTimeoutInMilliseconds, hashCode);
+            }
+            else
+            {
+                //更新本地调用次数
+                _serviceInvokeListenInfo.AddOrUpdate(serviceId, new ServiceInvokeListenInfo(), (k, v) => { v.LocalServiceRequests++; return v; });
+                return null;
+            }
+        }
+        else
+        {
+            return await MonitorRemoteInvokeAsync(parameters, serviceId, serviceKey, decodeJOject, command.ExecutionTimeoutInMilliseconds, hashCode);
+        }
+    }
+}
+```
+
+调用代理服务的方法`GetUserName(20)`，就是相当如下调用此方法：
+```csharp
+_breakeRemoteInvokeService.InvokeAsync(
+    new Dictionary<string, object>
+    {
+        {
+            "id", 20
+        }
+    }, 
+    "Surging.IModuleServices.Common.IUserService.GetUserName_id",
+    "User",
+    false
+)
+```
+```csharp
+//执行远程请求
+private async Task<RemoteInvokeResultMessage> MonitorRemoteInvokeAsync(IDictionary<string, object> parameters, string serviceId, string serviceKey, bool decodeJOject, int requestTimeout,int hashCode)
+{
+    var serviceInvokeInfo = _serviceInvokeListenInfo.GetOrAdd(serviceId, new ServiceInvokeListenInfo());
+    try
+    {
+        _serviceInvokeListenInfo.AddOrUpdate(serviceId, new ServiceInvokeListenInfo(), (k, v) =>
+        {
+            //更新远程调用请求数
+            v.RemoteServiceRequests = v.RemoteServiceRequests == null ? 1 : ++v.RemoteServiceRequests;
+            //更新最后一次远程调用时间
+            v.FinalRemoteInvokeTime = DateTime.Now;
+            //增加并发标记数
+            ++v.ConcurrentRequests;
+            return v;
+        });
+        var message = await _remoteInvokeService.InvokeAsync(new RemoteInvokeContext
+        {
+            HashCode=hashCode ,
+            InvokeMessage = new RemoteInvokeMessage
+            {
+                Parameters = parameters,
+                ServiceId = serviceId,
+                ServiceKey = serviceKey,
+                DecodeJOject = decodeJOject,
+            }
+        }, requestTimeout);
+        _serviceInvokeListenInfo.AddOrUpdate(serviceId, new ServiceInvokeListenInfo(), (k, v) =>
+        {
+            //重置失败调用次数
+            v.SinceFaultRemoteServiceRequests = 0;
+            //调用完成，减少并发标记数
+            --v.ConcurrentRequests; return v;
+        });
+        return message;
+    }
+    catch
+    {
+        _serviceInvokeListenInfo.AddOrUpdate(serviceId, new ServiceInvokeListenInfo(), (k, v) =>
+        {
+            //更新总失败调用次数
+            ++v.FaultRemoteServiceRequests;
+            //更新连续失败次数
+            ++v.SinceFaultRemoteServiceRequests;
+            //减少并发标记数
+            --v.ConcurrentRequests;
+            return v;
+        });
+        return null;
+    }
+}
+```
+### RemoteInvokeService
+```csharp
+namespace Surging.Core.CPlatform.Runtime.Client.Implementation
+{
+    public class RemoteInvokeService : IRemoteInvokeService
+    {
+        private readonly IAddressResolver _addressResolver;
+        private readonly ITransportClientFactory _transportClientFactory;
+        private readonly ILogger<RemoteInvokeService> _logger;
+        private readonly IHealthCheckService _healthCheckService;
+
+        public RemoteInvokeService(IHashAlgorithm hashAlgorithm,IAddressResolver addressResolver, ITransportClientFactory transportClientFactory, ILogger<RemoteInvokeService> logger, IHealthCheckService healthCheckService)
+        {
+            _addressResolver = addressResolver;
+            _transportClientFactory = transportClientFactory;
+            _logger = logger;
+            _healthCheckService = healthCheckService;
+        }
+
+        #region Implementation of IRemoteInvokeService
+        public async Task<RemoteInvokeResultMessage> InvokeAsync(RemoteInvokeContext context, int requestTimeout)
+        {
+            var invokeMessage = context.InvokeMessage;
+            var address = await ResolverAddress(context,context.HashCode);
+            try
+            {
+                var endPoint = address.CreateEndPoint();
+                invokeMessage.Token = address.Token;
+                if (_logger.IsEnabled(LogLevel.Debug))
+                    _logger.LogDebug($"使用地址：'{endPoint}'进行调用。");
+                var client = _transportClientFactory.CreateClient(endPoint);
+                return await client.SendAsync(invokeMessage).WithCancellation(requestTimeout);
+            }
+            catch (CommunicationException)
+            {
+                await _healthCheckService.MarkFailure(address);
+                throw;
+            }
+            catch (Exception exception)
+            {
+                _logger.LogError(exception, $"发起请求中发生了错误，服务Id：{invokeMessage.ServiceId}。");
+                throw;
+            }
+        }
+
+        private async ValueTask<AddressModel> ResolverAddress(RemoteInvokeContext context,int hashCode)
+        {
+            if (context == null)
+                throw new ArgumentNullException(nameof(context));
+
+            if (context.InvokeMessage == null)
+                throw new ArgumentNullException(nameof(context.InvokeMessage));
+
+            if (string.IsNullOrEmpty(context.InvokeMessage.ServiceId))
+                throw new ArgumentException("服务Id不能为空。", nameof(context.InvokeMessage.ServiceId));
+            var invokeMessage = context.InvokeMessage; 
+            var address = await _addressResolver.Resolver(invokeMessage.ServiceId, hashCode);
+            if (address == null)
+                throw new CPlatformException($"无法解析服务Id：{invokeMessage.ServiceId}的地址信息。");
+            return address;
+        }
+
+        #endregion Implementation of IRemoteInvokeService
+    }
+}
+```
+`IRemoteInvokeService`注册时机：
+```csharp
+public static IServiceBuilder AddClientRuntime(this IServiceBuilder builder)
+{
+    var services = builder.Services;
+    services.RegisterType(typeof(DefaultHealthCheckService)).As(typeof(IHealthCheckService)).SingleInstance();
+    services.RegisterType(typeof(DefaultAddressResolver)).As(typeof(IAddressResolver)).SingleInstance();
+    services.RegisterType(typeof(RemoteInvokeService)).As(typeof(IRemoteInvokeService)).SingleInstance();
+    return builder.UseAddressSelector().AddRuntime().AddClusterSupport();
+}
+...
+public static IServiceBuilder AddRelateServiceRuntime(this IServiceBuilder builder)
+{
+    var services = builder.Services;
+    services.RegisterType(typeof(DefaultHealthCheckService)).As(typeof(IHealthCheckService)).SingleInstance();
+    services.RegisterType(typeof(DefaultAddressResolver)).As(typeof(IAddressResolver)).SingleInstance();
+    services.RegisterType(typeof(RemoteInvokeService)).As(typeof(IRemoteInvokeService)).SingleInstance();
+    return builder.UseAddressSelector().AddClusterSupport();
+}
+```
+RemoteInvokeService中需要注入的服务IHealthCheckService，IAddressResolver也是在此时注册的。
+
+IHashAlgorithm在AddCoreService方法中注册。
+
+`ITransportClientFactory`的注册：
+```csharp
+namespace Surging.Core.DotNetty
+{
+   public static class ContainerBuilderExtensions
+    {
+        /// <summary>
+        /// 使用DotNetty进行传输。
+        /// </summary>
+        /// <param name="builder">服务构建者。</param>
+        /// <returns>服务构建者。</returns>
+        public static IServiceBuilder UseDotNettyTransport(this IServiceBuilder builder)
+        {
+            var services = builder.Services;
+            services.RegisterType(typeof(DotNettyTransportClientFactory)).As(typeof(ITransportClientFactory)).SingleInstance();
+            services.Register(provider => {
+              return  new DotNettyServerMessageListener(provider.Resolve<ILogger<DotNettyServerMessageListener>>(),
+                    provider.Resolve<ITransportMessageCodecFactory>());
+            }).SingleInstance();
+            services.Register(provider =>
+            {
+                var messageListener = provider.Resolve<DotNettyServerMessageListener>();
+                var serviceExecutor = provider.Resolve<IServiceExecutor>();
+                return new DefaultServiceHost(async endPoint =>
+                {
+                    await messageListener.StartAsync(endPoint);
+                    return messageListener;
+                }, serviceExecutor);
+                }).As<IServiceHost>(); 
+
+            return builder;
+        }
+    }
+}
+```
+
+### DefaultAddressResolver
+调用`_addressResolver.Resolver(invokeMessage.ServiceId, hashCode)`获取服务地址：
+
+```csharp
+using Microsoft.Extensions.Logging;
+using Surging.Core.CPlatform.Address;
+using Surging.Core.CPlatform.Routing;
+using Surging.Core.CPlatform.Routing.Implementation;
+using Surging.Core.CPlatform.Runtime.Client.Address.Resolvers.Implementation.Selectors;
+using Surging.Core.CPlatform.Runtime.Client.Address.Resolvers.Implementation.Selectors.Implementation;
+using Surging.Core.CPlatform.Runtime.Client.HealthChecks;
+using Surging.Core.CPlatform.Support;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace Surging.Core.CPlatform.Runtime.Client.Address.Resolvers.Implementation
+{
+    /// <summary>
+    /// 一个人默认的服务地址解析器。
+    /// </summary>
+    public class DefaultAddressResolver : IAddressResolver
+    {
+        #region Field
+
+        private readonly IServiceRouteManager _serviceRouteManager;
+        private readonly ILogger<DefaultAddressResolver> _logger;
+        private readonly IHealthCheckService _healthCheckService;
+        private readonly CPlatformContainer _container;
+        private readonly IAddressSelector _addressSelector;
+        private readonly IServiceCommandProvider _commandProvider;
+        private readonly ConcurrentDictionary<string, ServiceRoute> _concurrent =
+  new ConcurrentDictionary<string, ServiceRoute>();
+        #endregion Field
+
+        #region Constructor
+
+        public DefaultAddressResolver(IServiceCommandProvider commandProvider, IServiceRouteManager serviceRouteManager, ILogger<DefaultAddressResolver> logger, CPlatformContainer container, IHealthCheckService healthCheckService)
+        {
+            
+            _container = container;
+            _serviceRouteManager = serviceRouteManager;
+            _logger = logger;
+            _addressSelector = _container.GetInstances<IAddressSelector>(AddressSelectorMode.Polling.ToString());
+            _commandProvider = commandProvider;
+            _healthCheckService = healthCheckService;
+            serviceRouteManager.Changed += ServiceRouteManager_Removed;
+            serviceRouteManager.Removed += ServiceRouteManager_Removed;
+            serviceRouteManager.Created += ServiceRouteManager_Add;
+        }
+
+        #endregion Constructor
+
+        #region Implementation of IAddressResolver
+
+        /// <summary>
+        /// 解析服务地址。
+        /// </summary>
+        /// <param name="serviceId">服务Id。</param>
+        /// <returns>服务地址模型。</returns>
+        public async ValueTask<AddressModel> Resolver(string serviceId, int hashCode)
+        {
+            if (_logger.IsEnabled(LogLevel.Debug))
+                _logger.LogDebug($"准备为服务id：{serviceId}，解析可用地址。");
+            var addressSelector = _addressSelector;
+            _concurrent.TryGetValue(serviceId, out ServiceRoute descriptor);
+            if (descriptor == null)
+            {
+                var descriptors = await _serviceRouteManager.GetRoutesAsync();
+                descriptor = descriptors.FirstOrDefault(i => i.ServiceDescriptor.Id == serviceId);
+                if (descriptor != null)
+                {
+                    _concurrent.GetOrAdd(serviceId, descriptor);
+                }
+                else
+                {
+                    if (descriptor == null)
+                    {
+                        if (_logger.IsEnabled(LogLevel.Warning))
+                            _logger.LogWarning($"根据服务id：{serviceId}，找不到相关服务信息。");
+                        return null;
+                    }
+                }
+            }
+
+            var address = new List<AddressModel>();
+            foreach (var addressModel in descriptor.Address)
+            {
+                _healthCheckService.Monitor(addressModel);
+                if (!await _healthCheckService.IsHealth(addressModel))
+                    continue;
+
+                address.Add(addressModel);
+            }
+
+            if (address.Count == 0)
+            {
+                if (_logger.IsEnabled(LogLevel.Warning))
+                    _logger.LogWarning($"根据服务id：{serviceId}，找不到可用的地址。");
+                return null;
+            }
+
+            if (_logger.IsEnabled(LogLevel.Information))
+                _logger.LogInformation($"根据服务id：{serviceId}，找到以下可用地址：{string.Join(",", address.Select(i => i.ToString()))}。");
+
+            if (hashCode != 0)
+            {
+                var command = await _commandProvider.GetCommand(serviceId);
+                addressSelector = _container.GetInstances<IAddressSelector>(command.ShuntStrategy.ToString());
+            }
+            return await addressSelector.SelectAsync(new AddressSelectContext
+            {
+                Descriptor = descriptor.ServiceDescriptor,
+                Address = address,
+                HashCode = hashCode
+            });
+        }
+
+        private static string GetCacheKey(ServiceDescriptor descriptor)
+        {
+            return descriptor.Id;
+        }
+
+        private void ServiceRouteManager_Removed(object sender, ServiceRouteEventArgs e)
+        {
+            var key = GetCacheKey(e.Route.ServiceDescriptor);
+            ServiceRoute value;
+            _concurrent.TryRemove(key, out value);
+        }
+
+        private void ServiceRouteManager_Add(object sender, ServiceRouteEventArgs e)
+        {
+            var key = GetCacheKey(e.Route.ServiceDescriptor);
+            _concurrent.GetOrAdd(key, e.Route);
+        }
+
+        #endregion Implementation of IAddressResolver
+    }
+}
+```
+需要注入`IServiceCommandProvider`,`IServiceRouteManager`,`ILogger`,`CPlatformContainer`,`IHealthCheckService`服务。
+
+注册`IServiceRouteManager`
+Surging.Core.CPlatform  ContainerBuilderExtensions.cs
+```csharp
+/// <summary>
+/// 设置服务路由管理者。
+/// </summary>
+/// <param name="builder">服务构建者。</param>
+/// <param name="factory">服务路由管理者实例工厂。</param>
+/// <returns>服务构建者。</returns>
+public static IServiceBuilder UseRouteManager(this IServiceBuilder builder, Func<IServiceProvider, IServiceRouteManager> factory)
+{
+    builder.Services.RegisterAdapter(factory).InstancePerLifetimeScope();
+    return builder;
+}
+```
+Surging.Core.Consul   ContainerBuilderExtensions.cs
+```csharp
+public static IServiceBuilder UseConsulRouteManager(this IServiceBuilder builder, ConfigInfo configInfo)
+{
+    return builder.UseRouteManager(provider =>
+        new ConsulServiceRouteManager(
+        configInfo,
+        provider.GetRequiredService<ISerializer<byte[]>>(),
+        provider.GetRequiredService<ISerializer<string>>(),
+        provider.GetRequiredService<IClientWatchManager>(),
+        provider.GetRequiredService<IServiceRouteFactory>(),
+        provider.GetRequiredService<ILogger<ConsulServiceRouteManager>>()));
+}
+```
+
+>还支持使用ZooKeeperServiceRouteManager和SharedFileServiceRouteManager。
+
+```csharp
+public static IServiceBuilder UseConsulManager(this IServiceBuilder builder, ConfigInfo configInfo)
+{
+    return builder.UseConsulRouteManager(configInfo)
+        .UseConsulServiceSubscribeManager(configInfo)
+        .UseConsulCommandManager(configInfo)
+        .UseConsulCacheManager(configInfo).UseConsulWatch(configInfo);
+}
+```
+
+DefaultAddressResolver `Resolver`方法涉及的模块与内容较多，不在此处分析了，后面单独作分析。
+
+### 回到RemoteInvokeService
+
+取到服务地址后，就是进行调用：
+```csharp
+public async Task<RemoteInvokeResultMessage> InvokeAsync(RemoteInvokeContext context, int requestTimeout)
+{
+    var invokeMessage = context.InvokeMessage;
+    var address = await ResolverAddress(context,context.HashCode);
+    try
+    {
+        var endPoint = address.CreateEndPoint();
+        invokeMessage.Token = address.Token;
+        if (_logger.IsEnabled(LogLevel.Debug))
+            _logger.LogDebug($"使用地址：'{endPoint}'进行调用。");
+        var client = _transportClientFactory.CreateClient(endPoint);
+        return await client.SendAsync(invokeMessage).WithCancellation(requestTimeout);
+    }
+    catch (CommunicationException)
+    {
+        await _healthCheckService.MarkFailure(address);
+        throw;
+    }
+    catch (Exception exception)
+    {
+        _logger.LogError(exception, $"发起请求中发生了错误，服务Id：{invokeMessage.ServiceId}。");
+        throw;
+    }
+}
+```
+调用涉及到更多的是Surging.Core.DotNetty模块，也留到后面在进行分析。InvokeAsync调用后再回到BreakeRemoteInvokeService。
+
+### 回到BreakeRemoteInvokeService
+
+```csharp
+public async Task<RemoteInvokeResultMessage> InvokeAsync(IDictionary<string, object> parameters, string serviceId, string serviceKey, bool decodeJOject)
+{
+    var serviceInvokeInfos = _serviceInvokeListenInfo.GetOrAdd(serviceId,
+        new ServiceInvokeListenInfo() { FirstInvokeTime=DateTime.Now,
+        FinalRemoteInvokeTime =DateTime.Now });
+    var command = await _commandProvider.GetCommand(serviceId);
+    var intervalSeconds = (DateTime.Now - serviceInvokeInfos.FinalRemoteInvokeTime).TotalSeconds;
+    bool reachConcurrentRequest() => serviceInvokeInfos.ConcurrentRequests > command.MaxConcurrentRequests;
+    bool reachRequestVolumeThreshold() => intervalSeconds <= 10
+        && serviceInvokeInfos.SinceFaultRemoteServiceRequests > command.BreakerRequestVolumeThreshold;
+    bool reachErrorThresholdPercentage() =>
+        serviceInvokeInfos.FaultRemoteServiceRequests / (serviceInvokeInfos.RemoteServiceRequests ?? 1) * 100 > command.BreakeErrorThresholdPercentage;
+    var hashCode = GetHashCode(command,parameters);
+    if (command.BreakerForceClosed)
+    {
+        _serviceInvokeListenInfo.AddOrUpdate(serviceId, new ServiceInvokeListenInfo(), (k, v) => { v.LocalServiceRequests++; return v; });
+        return null;
+    }
+    else
+    {
+        if (reachConcurrentRequest() || reachRequestVolumeThreshold() || reachErrorThresholdPercentage())
+        {
+            if (intervalSeconds * 1000 > command.BreakeSleepWindowInMilliseconds)
+            {
+                return await MonitorRemoteInvokeAsync(parameters, serviceId, serviceKey, decodeJOject, command.ExecutionTimeoutInMilliseconds, hashCode);
+            }
+            else
+            {
+                _serviceInvokeListenInfo.AddOrUpdate(serviceId, new ServiceInvokeListenInfo(), (k, v) => { v.LocalServiceRequests++; return v; });
+                return null;
+            }
+        }
+        else
+        {
+            return await MonitorRemoteInvokeAsync(parameters, serviceId, serviceKey, decodeJOject, command.ExecutionTimeoutInMilliseconds, hashCode);
+        }
+    }
+}
+
+private async Task<RemoteInvokeResultMessage> MonitorRemoteInvokeAsync(IDictionary<string, object> parameters, string serviceId, string serviceKey, bool decodeJOject, int requestTimeout,int hashCode)
+{
+    var serviceInvokeInfo = _serviceInvokeListenInfo.GetOrAdd(serviceId, new ServiceInvokeListenInfo());
+    try
+    {
+        _serviceInvokeListenInfo.AddOrUpdate(serviceId, new ServiceInvokeListenInfo(), (k, v) =>
+        {
+            //更新远程调用请求数
+            v.RemoteServiceRequests = v.RemoteServiceRequests == null ? 1 : ++v.RemoteServiceRequests;
+            //更新最后一次远程调用时间
+            v.FinalRemoteInvokeTime = DateTime.Now;
+            //增加并发标记数
+            ++v.ConcurrentRequests;
+            return v;
+        });
+        var message = await _remoteInvokeService.InvokeAsync(new RemoteInvokeContext
+        {
+            HashCode=hashCode ,
+            InvokeMessage = new RemoteInvokeMessage
+            {
+                Parameters = parameters,
+                ServiceId = serviceId,
+                ServiceKey = serviceKey,
+                DecodeJOject = decodeJOject,
+            }
+        }, requestTimeout);
+        _serviceInvokeListenInfo.AddOrUpdate(serviceId, new ServiceInvokeListenInfo(), (k, v) =>
+        {
+            //重置失败调用次数
+            v.SinceFaultRemoteServiceRequests = 0;
+            //调用完成，减少并发标记数
+            --v.ConcurrentRequests; return v;
+        });
+        return message;
+    }
+    catch
+    {
+        _serviceInvokeListenInfo.AddOrUpdate(serviceId, new ServiceInvokeListenInfo(), (k, v) =>
+        {
+            ++v.FaultRemoteServiceRequests;
+            //更新连续失败次数
+            ++v.SinceFaultRemoteServiceRequests;
+            //减少并发标记数
+            --v.ConcurrentRequests;
+            return v;
+        });
+        return null;
+    }
+}
+```
+
+调用完`MonitorRemoteInvokeAsync`与`InvokeAsync`，回到ServiceProxyBase
+
+### 再回到ServiceProxyBase
+
+之前走的流程是服务命令设置没有开启缓存，现在分析没有开启缓存：
+```csharp
+protected async Task<T> Invoke<T>(IDictionary<string, object> parameters, string serviceId)
+{
+    object result = default(T);
+    var command = await _commandProvider.GetCommand(serviceId);
+    RemoteInvokeResultMessage message;
+    var decodeJOject = typeof(T) == UtilityType.ObjectType;
+    //没有开启缓存
+    if (!command.RequestCacheEnabled || decodeJOject)
+    {
+        var v = typeof(T).FullName;
+        message = await _breakeRemoteInvokeService.InvokeAsync(parameters, serviceId, _serviceKey, decodeJOject);
+        if (message == null)
+        {
+            var invoker = _serviceProvider.GetInstances<IClusterInvoker>(command.Strategy.ToString());
+            return await invoker.Invoke<T>(parameters, serviceId, _serviceKey, typeof(T) == UtilityType.ObjectType);
+        }
+    }
+    else
+    {
+        var invocation = GetInvocation(parameters, serviceId, typeof(T));
+        await _interceptor.Intercept(invocation);
+        message = invocation.ReturnValue is RemoteInvokeResultMessage
+            ? invocation.ReturnValue as RemoteInvokeResultMessage : null;
+        result = invocation.ReturnValue;
+    }
+
+    if (message != null)
+        result = _typeConvertibleService.Convert(message.Result, typeof(T));
+    return (T)result;
+}
+```
+
+```csharp
+private IInvocation GetInvocation(IDictionary<string, object> parameters, string serviceId, Type returnType)
+{
+    var invocation = _serviceProvider.GetInstances<IInterceptorProvider>();
+    return invocation.GetInvocation(this, parameters, serviceId, returnType);
+}
+```
+`IInterceptorProvider`的注册：
+```csharp
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
