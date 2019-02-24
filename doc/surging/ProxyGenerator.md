@@ -1924,7 +1924,353 @@ private IInvocation GetInvocation(IDictionary<string, object> parameters, string
 ```
 `IInterceptorProvider`的注册：
 ```csharp
+public static IServiceBuilder AddClientIntercepted(this IServiceBuilder builder, Type interceptorServiceTypes )
+{
+    var services = builder.Services;
+    services.RegisterType(interceptorServiceTypes).As<IInterceptor>().SingleInstance();
+    services.RegisterType<InterceptorProvider>().As<IInterceptorProvider>().SingleInstance();
+    return builder;
+}
 ```
+```csharp
+...
+option.AddClientIntercepted(typeof(CacheProviderInterceptor));
+...
+```
+`CacheProviderInterceptor`注册为IInterceptor类型。
+
+`InterceptorProvider` GetInvocation:
+```csharp
+ public IInvocation GetInvocation(object proxy, IDictionary<string, object> parameters,
+            string serviceId,Type returnType)
+{
+    var entry = (from q in _serviceEntryManager.GetEntries()
+                    let k = q.Attributes
+                    where q.Descriptor.Id == serviceId
+                    select q).FirstOrDefault();
+    var constructor = InvocationMethods.CompositionInvocationConstructor;
+    return constructor.Invoke(new object[]{
+            parameters,
+            serviceId,
+            GetKey(parameters),
+            entry.Attributes,
+            returnType,
+            proxy
+        }) as IInvocation;
+}
+private string[] GetKey(IDictionary<string, object> parameterValue)
+{
+    var param = parameterValue.Values.FirstOrDefault();
+    var reuslt = default(string[]);
+    if (parameterValue.Count() > 0)
+    {
+        reuslt = new string[] { param.ToString() };
+        if (!(param is IEnumerable))
+        {
+            var runtimeProperties = param.GetType().GetRuntimeProperties();
+            var properties = (from q in runtimeProperties
+                                let k = q.GetCustomAttribute<KeyAttribute>()
+                                where k != null
+                                orderby (k as KeyAttribute).SortIndex
+                                select q).ToList();
+
+            reuslt = properties.Count() > 0 ?
+                        properties.Select(p => p.GetValue(parameterValue.Values.FirstOrDefault()).ToString()).ToArray() : reuslt;
+        }
+    }
+    return reuslt;
+}
+```
+>如果调用GetUser(UserModel user)方法，就是调用生成的代理的：
+```csharp
+public async Task<Surging.IModuleServices.Common.Models.UserModel> GetUser(Surging.IModuleServices.Common.Models.UserModel user)
+{
+    return await Invoke<Surging.IModuleServices.Common.Models.UserModel>(new Dictionary<string, object>
+    {
+        {
+            "user", user
+        }
+    }
+    , "Surging.IModuleServices.Common.IUserService.GetUser_user");
+}
+```
+
+CacheKey继承KeyAttribute:
+```csharp
+public class UserModel
+{
+
+[ProtoMember(1)]
+[CacheKey(1)]
+public int UserId { get; set; }
+
+[ProtoMember(2)]
+public string Name { get; set; }
+
+[ProtoMember(3)]
+public int Age { get; set; }
+
+}
+```
+所以GetKey取到的是UserModel实例的UserId字段的值（获取标记了CacheKey特性的属性的值）;
+
+```csharp
+public  class InvocationMethods
+{
+    public static readonly ConstructorInfo CompositionInvocationConstructor =
+    typeof(ActionInvocation).GetConstructor(BindingFlags.Instance | BindingFlags.NonPublic, null,
+                                                    new[]
+                                                    {
+                                                            typeof(IDictionary<string, object>),
+                                                            typeof(string),
+                                                            typeof(string[]),
+                                                            typeof(List<Attribute>),
+                                                            typeof(Type),
+                                                            typeof(object)
+                                                    },
+                                                    null);
+
+}
+```
+所以，GetInvocation就只调用`ActionInvocation`的构造函数进行实例化。
+
+```csharp
+public class ActionInvocation : AbstractInvocation
+{
+    protected ActionInvocation(
+            IDictionary<string, object> arguments,
+        string serviceId,
+        string[] cacheKey,
+        List<Attribute> attributes,
+        Type returnType,
+        object proxy
+        ) : base(arguments, serviceId, cacheKey, attributes, returnType, proxy)
+    {
+    }
+
+    public override async Task Proceed()
+    {
+        try
+        {
+            _returnValue = await (Proxy as ServiceProxyBase).CallInvoke(parameters: Arguments, serviceId: ServiceId);
+        }
+        catch (Exception ex)
+        {
+            throw ex;
+        }
+    }
+}
+```
+```csharp
+public abstract class AbstractInvocation : IInvocation
+{
+    private readonly IDictionary<string, object> _arguments;
+    private readonly string _serviceId;
+    private readonly string[] _cacheKey;
+    private readonly List<Attribute> _attributes;
+    private readonly Type _returnType;
+    protected readonly object proxyObject;
+    protected object _returnValue;
+
+    protected AbstractInvocation(
+        IDictionary<string, object> arguments,
+        string serviceId,
+        string[] cacheKey,
+        List<Attribute> attributes,
+        Type returnType,
+        object proxy
+        )
+    {
+        _arguments = arguments;
+        _serviceId = serviceId;
+        _cacheKey = cacheKey;
+        _attributes = attributes;
+        _returnType = returnType;
+        proxyObject = proxy;
+    }
+
+    public object Proxy => proxyObject;
+
+    public string ServiceId => _serviceId;
+    public string[] CacheKey => _cacheKey;
+
+    public IDictionary<string, object> Arguments => _arguments;
+
+    public List<Attribute> Attributes => _attributes;
+
+    object IInvocation.ReturnValue { get => _returnValue; set => _returnValue = value; }
+
+    public Type ReturnType => _returnType;
+
+    public abstract Task Proceed();
+
+
+    public void SetArgumentValue(int index, object value)
+    {
+        throw new NotImplementedException();
+    }
+}
+```
+
+所以缓存拦截的逻辑：
+```csharp
+var invocation = GetInvocation(parameters, serviceId, typeof(T));
+await _interceptor.Intercept(invocation);
+message = invocation.ReturnValue is RemoteInvokeResultMessage
+    ? invocation.ReturnValue as RemoteInvokeResultMessage : null;
+result = invocation.ReturnValue;
+```
+invocation就是ActionInvocation的实例。
+
+_interceptor就是CacheProviderInterceptor实例。
+```csharp
+public class CacheProviderInterceptor : IInterceptor
+{
+    public async Task Intercept(IInvocation invocation)
+    {
+        //invocation.Attributes就是接口方法上标记的特性
+        var attribute =
+                invocation.Attributes.Where(p => p is InterceptMethodAttribute)
+                .Select(p => p as InterceptMethodAttribute).FirstOrDefault();
+        //invocation.CacheKey 就是就用接口方法时，传入的参数的标记了CacheKey的属性的属性的值的数组集合
+        var cacheKey = invocation.CacheKey==null?attribute.Key:
+            string.Format(attribute.Key, invocation.CacheKey);
+        //[InterceptMethod(CachingMethod.Get, Key = "GetUser_id_{0}", CacheSectionType = SectionType.ddlCache, Mode = CacheTargetType.Redis, Time = 480)] 
+        //cacheKey可以能为GetUser_id_20这种格式
+        await CacheIntercept(attribute, cacheKey, invocation);
+    }
+
+    private async Task CacheIntercept(InterceptMethodAttribute attribute, string key, IInvocation invocation)
+    {
+        ICacheProvider cacheProvider = null;
+        switch (attribute.Mode)
+        {
+            case CacheTargetType.Redis:
+                {
+                    cacheProvider = CacheContainer.GetInstances<ICacheProvider>(string.Format("{0}.{1}",
+                        attribute.CacheSectionType.ToString(), CacheTargetType.Redis.ToString()));
+                    break;
+                }
+            case CacheTargetType.MemoryCache:
+                {
+                    cacheProvider = CacheContainer.GetInstances<ICacheProvider>(CacheTargetType.MemoryCache.ToString());
+                    break;
+                }
+        }
+        if (cacheProvider != null) await Invoke(cacheProvider, attribute, key, invocation);
+    }
+
+    private async Task Invoke(ICacheProvider cacheProvider,InterceptMethodAttribute attribute, string key, IInvocation invocation)
+    {
+        switch (attribute.Method)
+        {
+            case CachingMethod.Get:
+                {
+                    var retrunValue = await cacheProvider.GetFromCacheFirst(key, async() =>
+                    {
+                        await invocation.Proceed();
+                        return invocation.ReturnValue;
+                    }, invocation.ReturnType, attribute.Time);
+                    invocation.ReturnValue = retrunValue;
+                    break;
+                }
+            default:
+                {
+                    await invocation.Proceed();
+                    //需要把相关的缓存移除
+                    //比如这样配置[InterceptMethod(CachingMethod.Remove, "GetUser_id_{0}", "GetUserName_name_{0}", CacheSectionType = SectionType.ddlCache, Mode = CacheTargetType.Redis)]
+                    //要把GetUser_id_{0}，GetUserName_name_{0}对应缓存移除
+                    var keys = attribute.CorrespondingKeys.Select(correspondingKey => string.Format(correspondingKey, key)).ToList();
+                    keys.ForEach(cacheProvider.RemoveAsync);
+                    break;
+                }
+        }
+    }
+}
+```
+>invocation.Proceed() 就是执行远程调用。
+
+```csharp
+public static async Task<T> GetFromCacheFirst<T>(this ICacheProvider cacheProvider, string key, Func<Task<T>> getFromPersistence, Type returnType, long? storeTime = null) where T : class
+{
+    object returnValue;
+    try
+    {
+        var resultJson = cacheProvider.Get<string>(key);
+        if (string.IsNullOrEmpty(resultJson) || resultJson == "\"[]\"")
+        {
+            //没有缓存，执行传进来的委托，其实委托的逻辑就是执行远程调用并返回结果
+            returnValue = await getFromPersistence();
+            //缓存远程调用的结果
+            if (returnValue != null)
+            {
+                resultJson = JsonConvert.SerializeObject(returnValue);
+                //设置了缓存时间
+                if (storeTime.HasValue)
+                {
+                    cacheProvider.Remove(key);//移除原有缓存
+                    cacheProvider.Add(key, resultJson, storeTime.Value);//添加缓存并设置缓存时间
+                }
+                else
+                {
+                    cacheProvider.Remove(key);//移除原有缓存
+                    cacheProvider.Add(key, resultJson);//添加缓存，没有设置缓存时间
+                }
+            }
+        }
+        else
+        {
+            //反序列化缓存
+            returnValue = JsonConvert.DeserializeObject(resultJson, returnType);
+        }
+        return returnValue as T;
+    }
+    catch
+    {
+        //调用委托
+        returnValue = await getFromPersistence();
+        return returnValue as T;
+    }
+}
+```
+
+看一下`invocation.Proceed();`的逻辑：
+
+ActionInvocation.cs
+```csharp
+public override async Task Proceed()
+{
+    try
+    {
+        _returnValue = await (Proxy as ServiceProxyBase).CallInvoke(parameters: Arguments, serviceId: ServiceId);
+    }
+    catch (Exception ex)
+    {
+        throw ex;
+    }
+}
+```
+
+也就是调用`ServiceProxyBase`的`CallInvoke`方法：
+```csharp
+public async Task<object> CallInvoke(IDictionary<string, object> parameters, string serviceId)
+{
+    var task = _breakeRemoteInvokeService.InvokeAsync(parameters, serviceId, _serviceKey, true);
+    task.Wait();
+    //按容错设置进行调用
+    if (task.Result == null)
+    {
+        var command = await _commandProvider.GetCommand(serviceId);
+        var invoker = _serviceProvider.GetInstances<IClusterInvoker>(command.Strategy.ToString());
+        return await invoker.Invoke<object>(parameters, serviceId, _serviceKey, true);
+    }
+    return task.Result;
+}
+```
+就和没有设置缓存的调用一样了。
+
+
+
 
 
 
