@@ -15,6 +15,7 @@
 - [自定义Host](/自定义Host.md)
 - Surging
  - [Surging.Core.ServiceHosting](surging/ServiceHosting.md)
- - [Surging.Core.ProxyGenerator](surging/ProxyGenerator.md)
+ - [客户端代理调用](surging/客户端代理调用.md)
+ - [客户端路由调用](surging/客户端路由调用.md)
 - Abp
  - [Abp.Runtime.Session](abp/Abp.Runtime.Session.md)
