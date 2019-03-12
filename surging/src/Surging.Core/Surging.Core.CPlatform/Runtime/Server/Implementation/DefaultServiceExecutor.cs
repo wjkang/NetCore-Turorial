@@ -9,7 +9,7 @@ using Surging.Core.CPlatform.Filters.Implementation;
 using Surging.Core.CPlatform.Filters;
 using System.Threading;
 using Surging.Core.CPlatform.Routing;
- using Surging.Core.CPlatform;
+using Surging.Core.CPlatform;
 using Newtonsoft.Json;
 
 namespace Surging.Core.CPlatform.Runtime.Server.Implementation
@@ -62,19 +62,19 @@ namespace Surging.Core.CPlatform.Runtime.Server.Implementation
             }
             catch (Exception exception)
             {
-                _logger.LogError(exception,"将接收到的消息反序列化成 TransportMessage<RemoteInvokeMessage> 时发送了错误。");
+                _logger.LogError(exception, "将接收到的消息反序列化成 TransportMessage<RemoteInvokeMessage> 时发送了错误。");
                 return;
             }
-             
+
             var entry = _serviceEntryLocate.Locate(remoteInvokeMessage);
-             
+
             if (entry == null)
             {
                 if (_logger.IsEnabled(LogLevel.Error))
                     _logger.LogError($"根据服务Id：{remoteInvokeMessage.ServiceId}，找不到服务条目。");
                 return;
             }
-            
+
 
             if (_logger.IsEnabled(LogLevel.Debug))
                 _logger.LogDebug("准备执行本地逻辑。");
@@ -85,7 +85,7 @@ namespace Surging.Core.CPlatform.Runtime.Server.Implementation
             if (entry.Descriptor.WaitExecution())
             {
                 //执行本地代码。
-                await  LocalExecuteAsync(entry, remoteInvokeMessage, resultMessage);
+                await LocalExecuteAsync(entry, remoteInvokeMessage, resultMessage);
                 //向客户端发送调用结果。
                 await SendRemoteInvokeResult(sender, message.Id, resultMessage);
             }
@@ -97,9 +97,9 @@ namespace Surging.Core.CPlatform.Runtime.Server.Implementation
                 await Task.Factory.StartNew(async () =>
                 {
                     //执行本地代码。
-                  await   LocalExecuteAsync(entry, remoteInvokeMessage, resultMessage);
-            }, TaskCreationOptions.LongRunning);
-        }
+                    await LocalExecuteAsync(entry, remoteInvokeMessage, resultMessage);
+                }, TaskCreationOptions.LongRunning);
+            }
         }
 
         #endregion Implementation of IServiceExecutor
@@ -128,8 +128,8 @@ namespace Surging.Core.CPlatform.Runtime.Server.Implementation
                         if (taskType.IsGenericType)
                             resultMessage.Result = taskType.GetProperty("Result").GetValue(task);
                     }
-                 
-                    if(remoteInvokeMessage.DecodeJOject && !(resultMessage.Result is IConvertible && typeof(IConvertible).GetTypeInfo().IsAssignableFrom(resultMessage.Result.GetType())))
+
+                    if (remoteInvokeMessage.DecodeJOject && !(resultMessage.Result is IConvertible && typeof(IConvertible).GetTypeInfo().IsAssignableFrom(resultMessage.Result.GetType())))
                     {
                         resultMessage.Result = JsonConvert.SerializeObject(resultMessage.Result);
                     }
@@ -138,15 +138,15 @@ namespace Surging.Core.CPlatform.Runtime.Server.Implementation
             catch (Exception exception)
             {
                 if (_logger.IsEnabled(LogLevel.Error))
-                    _logger.LogError(exception,"执行本地逻辑时候发生了错误。");
+                    _logger.LogError(exception, "执行本地逻辑时候发生了错误。");
                 resultMessage.ExceptionMessage = GetExceptionMessage(exception);
             }
         }
 
-        private  async Task OnAuthorization(ServiceEntry entry, RemoteInvokeMessage remoteInvokeMessage,
+        private async Task OnAuthorization(ServiceEntry entry, RemoteInvokeMessage remoteInvokeMessage,
             RemoteInvokeResultMessage resultMessage, CancellationTokenSource cancelTokenSource)
         {
-            if (entry.Descriptor.EnableAuthorization() && entry.Descriptor.AuthType() ==AuthorizationType.AppSecret.ToString())
+            if (entry.Descriptor.EnableAuthorization() && entry.Descriptor.AuthType() == AuthorizationType.AppSecret.ToString())
             {
                 var route = await _serviceRouteProvider.Locate(entry.Descriptor.Id);
                 var routeContext = new ServiceRouteContext()
@@ -155,12 +155,12 @@ namespace Surging.Core.CPlatform.Runtime.Server.Implementation
                     InvokeMessage = remoteInvokeMessage,
                     ResultMessage = resultMessage,
                 };
-                 _authorizationFilter.ExecuteAuthorizationFilterAsync(routeContext, cancelTokenSource.Token);
+                _authorizationFilter.ExecuteAuthorizationFilterAsync(routeContext, cancelTokenSource.Token);
                 if (!string.IsNullOrEmpty(resultMessage.ExceptionMessage))
                     cancelTokenSource.Cancel();
             }
         }
-         
+
 
         private async Task SendRemoteInvokeResult(IMessageSender sender, string messageId, RemoteInvokeResultMessage resultMessage)
         {
@@ -176,7 +176,7 @@ namespace Surging.Core.CPlatform.Runtime.Server.Implementation
             catch (Exception exception)
             {
                 if (_logger.IsEnabled(LogLevel.Error))
-                    _logger.LogError(exception,"发送响应消息时候发生了异常。" );
+                    _logger.LogError(exception, "发送响应消息时候发生了异常。");
             }
         }
 
