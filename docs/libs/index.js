@@ -23,7 +23,8 @@ window.$docsify = {
     paths: 'auto',
     placeholder: {
       '/': '搜索'
-    }
+    },
+    depth: 6
   },
   // plugins: [
   //   function(hook, vm) {
