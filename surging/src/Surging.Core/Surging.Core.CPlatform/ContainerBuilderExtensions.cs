@@ -403,8 +403,9 @@ namespace Surging.Core.CPlatform
                 services.RegisterAssemblyTypes(assembly)
                    .Where(t => typeof(IServiceKey).GetTypeInfo().IsAssignableFrom(t) && t.IsInterface)
                    .AsImplementedInterfaces();
+
                 services.RegisterAssemblyTypes(assembly)
-             .Where(t => typeof(ServiceBase).GetTypeInfo().IsAssignableFrom(t) && t.GetTypeInfo().GetCustomAttribute<ModuleNameAttribute>() == null).AsImplementedInterfaces();
+                   .Where(t => typeof(ServiceBase).GetTypeInfo().IsAssignableFrom(t) && t.GetTypeInfo().GetCustomAttribute<ModuleNameAttribute>() == null).AsImplementedInterfaces();
 
                 var types = assembly.GetTypes().Where(t => typeof(ServiceBase).GetTypeInfo().IsAssignableFrom(t) && t.GetTypeInfo().GetCustomAttribute<ModuleNameAttribute>() != null);
                 foreach (var type in types)

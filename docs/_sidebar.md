@@ -18,5 +18,6 @@
  - [客户端代理调用](surging/客户端代理调用.md)
  - [客户端路由调用](surging/客户端路由调用.md)
  - [使用服务端](surging/使用服务端.md)
+ - [服务命令](surging/服务命令.md)
 - Abp
  - [Abp.Runtime.Session](abp/Abp.Runtime.Session.md)
