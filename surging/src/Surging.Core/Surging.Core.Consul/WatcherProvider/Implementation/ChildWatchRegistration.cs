@@ -4,7 +4,7 @@ using System.Text;
 
 namespace Surging.Core.Consul.WatcherProvider.Implementation
 {
-  public  class ChildWatchRegistration : WatchRegistration
+    public class ChildWatchRegistration : WatchRegistration
     {
         private readonly IClientWatchManager watchManager;
 
