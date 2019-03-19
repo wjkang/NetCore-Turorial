@@ -200,6 +200,7 @@ namespace Surging.Core.Consul
             if (queryResult.Response != null)
             {
                 var data = (await _consul.GetDataAsync(path));
+                var dataStr = Encoding.UTF8.GetString(data);
                 if (data != null)
                 {
                     watcher.SetCurrentData(data);
