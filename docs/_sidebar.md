@@ -20,5 +20,6 @@
  - [使用服务端](surging/使用服务端.md)
  - [服务命令](surging/服务命令.md)
  - [服务路由](surging/服务路由.md)
+ - [服务熔断](surging/服务熔断.md)
 - Abp
  - [Abp.Runtime.Session](abp/Abp.Runtime.Session.md)
