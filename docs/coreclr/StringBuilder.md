@@ -1,0 +1,1 @@
+[StringBuilder](https://github.com/dotnet/coreclr/blob/master/src/System.Private.CoreLib/shared/System/Text/StringBuilder.cs)

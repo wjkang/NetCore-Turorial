@@ -25,3 +25,5 @@
  - [服务缓存降级](surging/服务缓存降级.md)
 - Abp
  - [Abp.Runtime.Session](abp/Abp.Runtime.Session.md)
+- coreclr
+ - [StringBuilder](coreclr/StringBuilder.md)
