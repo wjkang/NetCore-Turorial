@@ -11,7 +11,7 @@ gitalkConfig = {
 },
 window.$docsify = {
   name: 'NetCore Turorial',
-  repo: '',
+  repo: 'https://github.com/wjkang/NetCore-Turorial',
   auto2top: true,
   loadSidebar: true,
   subMaxLevel: 5,
