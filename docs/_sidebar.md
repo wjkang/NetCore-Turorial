@@ -24,6 +24,7 @@
  - [服务容错降级](surging/服务容错降级.md)
  - [服务缓存降级](surging/服务缓存降级.md)
  - [EventBus](surging/EventBus.md)
+ - [网关](surging/网关.md)
 - Abp
  - [Abp.Runtime.Session](abp/Abp.Runtime.Session.md)
 - coreclr
